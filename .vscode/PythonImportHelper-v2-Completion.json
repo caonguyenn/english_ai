@@ -1,0 +1,323 @@
+[
+    {
+        "label": "sys",
+        "kind": 6,
+        "isExtraImport": true,
+        "importPath": "sys",
+        "description": "sys",
+        "detail": "sys",
+        "documentation": {}
+    },
+    {
+        "label": "json",
+        "kind": 6,
+        "isExtraImport": true,
+        "importPath": "json",
+        "description": "json",
+        "detail": "json",
+        "documentation": {}
+    },
+    {
+        "label": "argparse",
+        "kind": 6,
+        "isExtraImport": true,
+        "importPath": "argparse",
+        "description": "argparse",
+        "detail": "argparse",
+        "documentation": {}
+    },
+    {
+        "label": "pformat",
+        "importPath": "pprint",
+        "description": "pprint",
+        "isExtraImport": true,
+        "detail": "pprint",
+        "documentation": {}
+    },
+    {
+        "label": "jmespath",
+        "kind": 6,
+        "isExtraImport": true,
+        "importPath": "jmespath",
+        "description": "jmespath",
+        "detail": "jmespath",
+        "documentation": {}
+    },
+    {
+        "label": "exceptions",
+        "importPath": "jmespath",
+        "description": "jmespath",
+        "isExtraImport": true,
+        "detail": "jmespath",
+        "documentation": {}
+    },
+    {
+        "label": "asyncio",
+        "kind": 6,
+        "isExtraImport": true,
+        "importPath": "asyncio",
+        "description": "asyncio",
+        "detail": "asyncio",
+        "documentation": {}
+    },
+    {
+        "label": "datetime",
+        "kind": 6,
+        "isExtraImport": true,
+        "importPath": "datetime",
+        "description": "datetime",
+        "detail": "datetime",
+        "documentation": {}
+    },
+    {
+        "label": "inspect",
+        "kind": 6,
+        "isExtraImport": true,
+        "importPath": "inspect",
+        "description": "inspect",
+        "detail": "inspect",
+        "documentation": {}
+    },
+    {
+        "label": "base64",
+        "kind": 6,
+        "isExtraImport": true,
+        "importPath": "base64",
+        "description": "base64",
+        "detail": "base64",
+        "documentation": {}
+    },
+    {
+        "label": "logging",
+        "kind": 6,
+        "isExtraImport": true,
+        "importPath": "logging",
+        "description": "logging",
+        "detail": "logging",
+        "documentation": {}
+    },
+    {
+        "label": "os",
+        "kind": 6,
+        "isExtraImport": true,
+        "importPath": "os",
+        "description": "os",
+        "detail": "os",
+        "documentation": {}
+    },
+    {
+        "label": "time",
+        "kind": 6,
+        "isExtraImport": true,
+        "importPath": "time",
+        "description": "time",
+        "detail": "time",
+        "documentation": {}
+    },
+    {
+        "label": "uuid",
+        "kind": 6,
+        "isExtraImport": true,
+        "importPath": "uuid",
+        "description": "uuid",
+        "detail": "uuid",
+        "documentation": {}
+    },
+    {
+        "label": "warnings",
+        "kind": 6,
+        "isExtraImport": true,
+        "importPath": "warnings",
+        "description": "warnings",
+        "detail": "warnings",
+        "documentation": {}
+    },
+    {
+        "label": "boto3",
+        "kind": 6,
+        "isExtraImport": true,
+        "importPath": "boto3",
+        "description": "boto3",
+        "detail": "boto3",
+        "documentation": {}
+    },
+    {
+        "label": "websockets",
+        "kind": 6,
+        "isExtraImport": true,
+        "importPath": "websockets",
+        "description": "websockets",
+        "detail": "websockets",
+        "documentation": {}
+    },
+    {
+        "label": "web",
+        "importPath": "aiohttp",
+        "description": "aiohttp",
+        "isExtraImport": true,
+        "detail": "aiohttp",
+        "documentation": {}
+    },
+    {
+        "label": "BedrockRuntimeClient",
+        "importPath": "aws_sdk_bedrock_runtime.client",
+        "description": "aws_sdk_bedrock_runtime.client",
+        "isExtraImport": true,
+        "detail": "aws_sdk_bedrock_runtime.client",
+        "documentation": {}
+    },
+    {
+        "label": "# Use BedrockRuntimeClient instead of BedrockRuntime",
+        "importPath": "aws_sdk_bedrock_runtime.client",
+        "description": "aws_sdk_bedrock_runtime.client",
+        "isExtraImport": true,
+        "detail": "aws_sdk_bedrock_runtime.client",
+        "documentation": {}
+    },
+    {
+        "label": "InvokeModelWithBidirectionalStreamOperationInput",
+        "importPath": "aws_sdk_bedrock_runtime.client",
+        "description": "aws_sdk_bedrock_runtime.client",
+        "isExtraImport": true,
+        "detail": "aws_sdk_bedrock_runtime.client",
+        "documentation": {}
+    },
+    {
+        "label": "Config",
+        "importPath": "aws_sdk_bedrock_runtime.config",
+        "description": "aws_sdk_bedrock_runtime.config",
+        "isExtraImport": true,
+        "detail": "aws_sdk_bedrock_runtime.config",
+        "documentation": {}
+    },
+    {
+        "label": "HTTPAuthSchemeResolver",
+        "importPath": "aws_sdk_bedrock_runtime.config",
+        "description": "aws_sdk_bedrock_runtime.config",
+        "isExtraImport": true,
+        "detail": "aws_sdk_bedrock_runtime.config",
+        "documentation": {}
+    },
+    {
+        "label": "SigV4AuthScheme",
+        "importPath": "aws_sdk_bedrock_runtime.config",
+        "description": "aws_sdk_bedrock_runtime.config",
+        "isExtraImport": true,
+        "detail": "aws_sdk_bedrock_runtime.config",
+        "documentation": {}
+    },
+    {
+        "label": "BidirectionalInputPayloadPart",
+        "importPath": "aws_sdk_bedrock_runtime.models",
+        "description": "aws_sdk_bedrock_runtime.models",
+        "isExtraImport": true,
+        "detail": "aws_sdk_bedrock_runtime.models",
+        "documentation": {}
+    },
+    {
+        "label": "InvokeModelWithBidirectionalStreamInputChunk",
+        "importPath": "aws_sdk_bedrock_runtime.models",
+        "description": "aws_sdk_bedrock_runtime.models",
+        "isExtraImport": true,
+        "detail": "aws_sdk_bedrock_runtime.models",
+        "documentation": {}
+    },
+    {
+        "label": "EnvironmentCredentialsResolver",
+        "importPath": "smithy_aws_core.identity.environment",
+        "description": "smithy_aws_core.identity.environment",
+        "isExtraImport": true,
+        "detail": "smithy_aws_core.identity.environment",
+        "documentation": {}
+    },
+    {
+        "label": "main",
+        "kind": 2,
+        "importPath": ".venv.bin.jp",
+        "description": ".venv.bin.jp",
+        "peekOfCode": "def main():\n    parser = argparse.ArgumentParser()\n    parser.add_argument('expression')\n    parser.add_argument('-f', '--filename',\n                        help=('The filename containing the input data.  '\n                              'If a filename is not given then data is '\n                              'read from stdin.'))\n    parser.add_argument('--ast', action='store_true',\n                        help=('Pretty print the AST, do not search the data.'))\n    args = parser.parse_args()",
+        "detail": ".venv.bin.jp",
+        "documentation": {}
+    },
+    {
+        "label": "BedrockStreamManager",
+        "kind": 6,
+        "importPath": "backend.server",
+        "description": "backend.server",
+        "peekOfCode": "class BedrockStreamManager:\n    \"\"\"Manages bidirectional streaming with AWS Bedrock using asyncio\"\"\"\n    # Event templates\n    START_SESSION_EVENT = \"\"\"{\n        \"event\": {\n            \"sessionStart\": {\n            \"inferenceConfiguration\": {\n                \"maxTokens\": 1024,\n                \"topP\": 0.9,\n                \"temperature\": 0.7",
+        "detail": "backend.server",
+        "documentation": {}
+    },
+    {
+        "label": "debug_print",
+        "kind": 2,
+        "importPath": "backend.server",
+        "description": "backend.server",
+        "peekOfCode": "def debug_print(message):\n    \"\"\"Print only if debug mode is enabled\"\"\"\n    if DEBUG:\n        functionName = inspect.stack()[1].function\n        if functionName == \"time_it\" or functionName == \"time_it_async\":\n            functionName = inspect.stack()[2].function\n        print(\n            \"{:%Y-%m-%d %H:%M:%S.%f}\".format(datetime.datetime.now())[:-3]\n            + \" \"\n            + functionName",
+        "detail": "backend.server",
+        "documentation": {}
+    },
+    {
+        "label": "time_it",
+        "kind": 2,
+        "importPath": "backend.server",
+        "description": "backend.server",
+        "peekOfCode": "def time_it(label, methodToRun):\n    start_time = time.perf_counter()\n    result = methodToRun()\n    end_time = time.perf_counter()\n    debug_print(f\"Execution time for {label}: {end_time - start_time:.4f} seconds\")\n    return result\nasync def time_it_async(label, methodToRun):\n    start_time = time.perf_counter()\n    result = await methodToRun()\n    end_time = time.perf_counter()",
+        "detail": "backend.server",
+        "documentation": {}
+    },
+    {
+        "label": "LOGLEVEL",
+        "kind": 5,
+        "importPath": "backend.server",
+        "description": "backend.server",
+        "peekOfCode": "LOGLEVEL = os.environ.get(\"LOGLEVEL\", \"INFO\").upper()\nlogging.basicConfig(level=LOGLEVEL, format=\"%(asctime)s %(message)s\")\nlogger = logging.getLogger(__name__)\nRUNNING_IN_DEV_MODE = os.environ.get(\"DEV_MODE\", \"False\").lower() == \"true\"\nBEDROCK_SECRET_NAME = \"bedrock_invoke_secret\"\nREGION = \"us-east-1\"\n# Suppress warnings\nwarnings.filterwarnings(\"ignore\")\n# Suppress websockets server non-critical logs that are triggered by NLB health checks (empty TCP packets)\nlogging.getLogger(\"websockets.server\").setLevel(logging.CRITICAL)",
+        "detail": "backend.server",
+        "documentation": {}
+    },
+    {
+        "label": "logger",
+        "kind": 5,
+        "importPath": "backend.server",
+        "description": "backend.server",
+        "peekOfCode": "logger = logging.getLogger(__name__)\nRUNNING_IN_DEV_MODE = os.environ.get(\"DEV_MODE\", \"False\").lower() == \"true\"\nBEDROCK_SECRET_NAME = \"bedrock_invoke_secret\"\nREGION = \"us-east-1\"\n# Suppress warnings\nwarnings.filterwarnings(\"ignore\")\n# Suppress websockets server non-critical logs that are triggered by NLB health checks (empty TCP packets)\nlogging.getLogger(\"websockets.server\").setLevel(logging.CRITICAL)\nDEBUG = False\ndef debug_print(message):",
+        "detail": "backend.server",
+        "documentation": {}
+    },
+    {
+        "label": "RUNNING_IN_DEV_MODE",
+        "kind": 5,
+        "importPath": "backend.server",
+        "description": "backend.server",
+        "peekOfCode": "RUNNING_IN_DEV_MODE = os.environ.get(\"DEV_MODE\", \"False\").lower() == \"true\"\nBEDROCK_SECRET_NAME = \"bedrock_invoke_secret\"\nREGION = \"us-east-1\"\n# Suppress warnings\nwarnings.filterwarnings(\"ignore\")\n# Suppress websockets server non-critical logs that are triggered by NLB health checks (empty TCP packets)\nlogging.getLogger(\"websockets.server\").setLevel(logging.CRITICAL)\nDEBUG = False\ndef debug_print(message):\n    \"\"\"Print only if debug mode is enabled\"\"\"",
+        "detail": "backend.server",
+        "documentation": {}
+    },
+    {
+        "label": "BEDROCK_SECRET_NAME",
+        "kind": 5,
+        "importPath": "backend.server",
+        "description": "backend.server",
+        "peekOfCode": "BEDROCK_SECRET_NAME = \"bedrock_invoke_secret\"\nREGION = \"us-east-1\"\n# Suppress warnings\nwarnings.filterwarnings(\"ignore\")\n# Suppress websockets server non-critical logs that are triggered by NLB health checks (empty TCP packets)\nlogging.getLogger(\"websockets.server\").setLevel(logging.CRITICAL)\nDEBUG = False\ndef debug_print(message):\n    \"\"\"Print only if debug mode is enabled\"\"\"\n    if DEBUG:",
+        "detail": "backend.server",
+        "documentation": {}
+    },
+    {
+        "label": "REGION",
+        "kind": 5,
+        "importPath": "backend.server",
+        "description": "backend.server",
+        "peekOfCode": "REGION = \"us-east-1\"\n# Suppress warnings\nwarnings.filterwarnings(\"ignore\")\n# Suppress websockets server non-critical logs that are triggered by NLB health checks (empty TCP packets)\nlogging.getLogger(\"websockets.server\").setLevel(logging.CRITICAL)\nDEBUG = False\ndef debug_print(message):\n    \"\"\"Print only if debug mode is enabled\"\"\"\n    if DEBUG:\n        functionName = inspect.stack()[1].function",
+        "detail": "backend.server",
+        "documentation": {}
+    },
+    {
+        "label": "DEBUG",
+        "kind": 5,
+        "importPath": "backend.server",
+        "description": "backend.server",
+        "peekOfCode": "DEBUG = False\ndef debug_print(message):\n    \"\"\"Print only if debug mode is enabled\"\"\"\n    if DEBUG:\n        functionName = inspect.stack()[1].function\n        if functionName == \"time_it\" or functionName == \"time_it_async\":\n            functionName = inspect.stack()[2].function\n        print(\n            \"{:%Y-%m-%d %H:%M:%S.%f}\".format(datetime.datetime.now())[:-3]\n            + \" \"",
+        "detail": "backend.server",
+        "documentation": {}
+    }
+]

@@ -1,0 +1,197 @@
+<!-- index.html -->
+<!doctype html>
+<html>
+<head>
+  <meta charset="utf-8" />
+  <title>Nova Sonic S2S Demo</title>
+  <style>
+    body { font-family: system-ui, -apple-system, sans-serif; padding: 20px; }
+    #log { height: 160px; overflow:auto; background:#fff; border:1px solid #ddd; padding:8px; margin-top:12px; }
+    button { padding:10px 14px; margin-right:8px; }
+  </style>
+</head>
+<body>
+  <h2>Nova Sonic — Speech → Speech (Demo)</h2>
+  <button id="btnStart">Start</button>
+  <button id="btnStop" disabled>Stop</button>
+  <div id="status">Disconnected</div>
+  <div id="log"></div>
+
+<script>
+const SERVER_WS = (location.protocol === 'https:') ? `wss://${location.host}/ws` : `ws://${location.hostname}:8080/ws`;
+const TARGET_RATE = 16000;
+const SERVER_OUTPUT_RATE = 24000; // match backend audioOutputConfiguration in server.py
+const SILENCE_MS = 900;
+const VAD_THRESHOLD = 0.012;
+
+let ws;
+let audioCtx;
+let mediaStream;
+let sourceNode;
+let processor;
+let silenceTimer = null;
+let speaking = false;
+let enabled = false;
+
+const logEl = document.getElementById('log');
+function log(...args){ console.log(...args); logEl.innerHTML += `<div>${args.join(' ')}</div>`; logEl.scrollTop = logEl.scrollHeight; }
+function setStatus(s){ document.getElementById('status').textContent = s; }
+
+document.getElementById('btnStart').onclick = start;
+document.getElementById('btnStop').onclick = stop;
+
+async function start(){
+  if (enabled) return;
+  enabled = true;
+  setStatus('Connecting…');
+  ws = new WebSocket(SERVER_WS);
+  ws.binaryType = 'arraybuffer';
+
+  ws.onopen = () => { setStatus('Connected'); log('WS open'); };
+  ws.onclose = () => { setStatus('Disconnected'); log('WS closed'); enabled=false; cleanup(); };
+  ws.onerror = (e) => { log('WS error', e); setStatus('Error'); };
+  ws.onmessage = (ev) => {
+    if (ev.data instanceof ArrayBuffer) {
+      // server sends raw PCM bytes (Int16) — play them
+      playServerPcm(ev.data);
+    } else {
+      try {
+        const obj = JSON.parse(ev.data);
+        if (obj.type === 'transcript') log('Transcript:', obj.text);
+        else log('WS message:', obj);
+      } catch (e) {
+        log('WS text:', ev.data);
+      }
+    }
+  };
+
+  // request mic
+  try {
+    mediaStream = await navigator.mediaDevices.getUserMedia({ audio: { channelCount:1 } });
+  } catch (e) {
+    log('Mic access denied', e); setStatus('Mic error'); return;
+  }
+
+  audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+  await audioCtx.resume();
+  log('AudioContext SR', audioCtx.sampleRate);
+
+  sourceNode = audioCtx.createMediaStreamSource(mediaStream);
+
+  // ScriptProcessor for compatibility; for production consider AudioWorklet
+  const frameSize = 4096;
+  processor = audioCtx.createScriptProcessor(frameSize, 1, 1);
+
+  processor.onaudioprocess = (e) => {
+    const inData = e.inputBuffer.getChannelData(0);
+    // compute RMS -> simple VAD
+    let rms = 0;
+    for (let i=0;i<inData.length;i++){ rms += inData[i]*inData[i]; }
+    rms = Math.sqrt(rms / inData.length);
+    if (rms > VAD_THRESHOLD) {
+      // user speaking
+      if (!speaking) {
+        speaking = true;
+        log('User started speaking');
+      }
+      if (silenceTimer) { clearTimeout(silenceTimer); silenceTimer = null; }
+    } else {
+      // silence
+      if (speaking && !silenceTimer) {
+        silenceTimer = setTimeout(()=> {
+          // end of turn
+          speaking = false;
+          log('Silence detected — sending stop');
+          if (ws && ws.readyState === WebSocket.OPEN) ws.send('stop');
+        }, SILENCE_MS);
+      }
+    }
+
+    // resample to TARGET_RATE
+    const resampled = resampleLinear(inData, audioCtx.sampleRate, TARGET_RATE);
+    // convert to Int16
+    const int16 = floatTo16BitPCM(resampled);
+    // send raw bytes as ArrayBuffer
+    if (ws && ws.readyState === WebSocket.OPEN) {
+      try { ws.send(int16.buffer); } catch (err) { console.warn('ws send err', err); }
+    }
+  };
+
+  sourceNode.connect(processor);
+  processor.connect(audioCtx.destination);
+  document.getElementById('btnStart').disabled = true;
+  document.getElementById('btnStop').disabled = false;
+}
+
+function stop(){
+  if (!enabled) return;
+  enabled = false;
+  if (ws && ws.readyState === WebSocket.OPEN) {
+    try { ws.send('stop'); ws.send('close'); ws.close(); } catch {}
+  }
+  cleanup();
+  setStatus('Stopped');
+  document.getElementById('btnStart').disabled = false;
+  document.getElementById('btnStop').disabled = true;
+}
+
+function cleanup(){
+  try {
+    if (processor) { processor.disconnect(); processor.onaudioprocess = null; processor = null; }
+    if (sourceNode) { sourceNode.disconnect(); sourceNode = null; }
+    if (mediaStream) { mediaStream.getTracks().forEach(t=>t.stop()); mediaStream=null; }
+    if (audioCtx) { audioCtx.close(); audioCtx = null; }
+    if (silenceTimer) { clearTimeout(silenceTimer); silenceTimer = null; }
+  } catch(e){ console.warn('cleanup err', e); }
+}
+
+// Simple linear resampling (fast)
+function resampleLinear(buffer, srcRate, dstRate){
+  if (srcRate === dstRate) return new Float32Array(buffer);
+  const ratio = srcRate / dstRate;
+  const outLength = Math.floor(buffer.length / ratio);
+  const out = new Float32Array(outLength);
+  for (let i=0;i<outLength;i++){
+    const srcIdx = i * ratio;
+    const i0 = Math.floor(srcIdx);
+    const i1 = Math.min(i0+1, buffer.length-1);
+    const frac = srcIdx - i0;
+    out[i] = buffer[i0]*(1-frac) + buffer[i1]*frac;
+  }
+  return out;
+}
+
+function floatTo16BitPCM(float32Arr){
+  const out = new Int16Array(float32Arr.length);
+  for (let i=0;i<float32Arr.length;i++){
+    let s = Math.max(-1, Math.min(1, float32Arr[i]));
+    out[i] = s < 0 ? s * 0x8000 : s * 0x7fff;
+  }
+  return out;
+}
+
+// Play server PCM (Int16) — server returns PCM bytes (LPCM) for Sonic output
+async function playServerPcm(arrayBuffer){
+  try {
+    if (!audioCtx) {
+      audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+    }
+    const int16 = new Int16Array(arrayBuffer);
+    const float32 = new Float32Array(int16.length);
+    for (let i=0;i<int16.length;i++) float32[i] = int16[i] / 0x8000;
+
+    // create buffer at server output sample rate
+    const buf = audioCtx.createBuffer(1, float32.length, SERVER_OUTPUT_RATE);
+    buf.copyToChannel(float32, 0, 0);
+
+    const src = audioCtx.createBufferSource();
+    src.buffer = buf;
+    src.connect(audioCtx.destination);
+    src.start();
+  } catch (e) {
+    console.error('play error', e);
+  }
+}
+</script>
+</body>
+</html>

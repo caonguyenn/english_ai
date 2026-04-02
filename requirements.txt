@@ -1,0 +1,11 @@
+fastapi
+uvicorn[default]
+langchain
+langchain-aws
+boto3
+python-multipart
+aiofiles
+aiohttp
+aws_sdk_bedrock_runtime
+smithy_aws_core
+rx
