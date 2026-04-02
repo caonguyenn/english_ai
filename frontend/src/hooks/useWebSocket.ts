@@ -14,7 +14,10 @@ export function useWebSocket() {
     if (wsRef.current && wsRef.current.readyState < WebSocket.CLOSING) return;
 
     const protocol = location.protocol === 'https:' ? 'wss:' : 'ws:';
-    const url = `${protocol}//${location.host}/ws`;
+    const wsHost = import.meta.env.VITE_WS_HOST || location.hostname;
+    const wsPort = import.meta.env.VITE_WS_PORT;
+    const host = wsPort ? `${wsHost}:${wsPort}` : wsHost;
+    const url = `${protocol}//${host}/ws`;
 
     setConnectionStatus('connecting');
     const ws = new WebSocket(url);

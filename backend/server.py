@@ -26,6 +26,10 @@ import time
 import uuid
 import warnings
 
+from dotenv import load_dotenv
+
+load_dotenv(os.path.join(os.path.dirname(__file__), ".env"))
+
 import boto3
 import websockets
 from aiohttp import web
@@ -951,12 +955,12 @@ async def authenticated_handler(websocket, path=None):
 
 async def main():
     """Main function to run the WebSocket server and MCP server."""
-    mcp_port = int(
-        os.environ.get("MCP_PORT", 8000)
-    )  # communicate with MCP on port 80, localhost
+    # mcp_port = int(
+    #     os.environ.get("MCP_PORT", 8000)
+    # )  # communicate with MCP on port 80, localhost
 
     # Start MCP server and wait for it to be ready
-    logger.info(f"Starting MCP server on localhost:{mcp_port}")
+    # logger.info(f"Starting MCP server on localhost:{mcp_port}")
     # mcp_task = asyncio.create_task(start_mcp_server(host="127.0.0.1", port=mcp_port))
     http_task = asyncio.create_task(start_http_server(8080))
 
@@ -983,7 +987,7 @@ async def main():
 
     try:
         async with websockets.serve(authenticated_handler, host, port):
-            logger.info(f"All services running - WebSocket: {port}, MCP: {mcp_port}")
+            logger.info(f"All services running - WebSocket: {port}")
             await asyncio.Future()
     except Exception as e:
         logger.error(f"Server startup error: {e}", exc_info=True)
