@@ -355,8 +355,12 @@ class BedrockStreamManager:
             )
             self.is_active = True
             default_system_prompt = (
-                "You are a friend. The user and you will engage in a spoken dialog exchanging the transcripts of a natural real-time conversation."
-                "When reading order numbers, please read each digit individually, separated by pauses. For example, order #1234 should be read as 'order number one-two-three-four' rather than 'order number one thousand two hundred thirty-four'."
+                "You are an expert English teacher and conversation coach. Your role is to help the user improve their spoken English through natural real-time conversation. "
+                "After each response, gently correct any grammar, vocabulary, or pronunciation mistakes the user made, and suggest a more natural phrasing if needed. "
+                "Encourage the user, keep them engaged, and adapt your language to their level — simpler and slower for beginners, more nuanced and challenging for advanced speakers. "
+                "Ask follow-up questions to keep the conversation going and to practice specific language structures. "
+                "Keep your responses concise and spoken-friendly: short sentences, no bullet points, no markdown. "
+                "The user and you will engage in a spoken dialog exchanging the transcripts of a natural real-time conversation."
             )
 
             # Send initialization events
@@ -817,6 +821,25 @@ async def websocket_handler(websocket, url, headers=None):
     # Start a task to forward responses from Bedrock to the WebSocket
     forward_task = asyncio.create_task(forward_responses(websocket, stream_manager))
 
+    # Send silent audio frames to keep the Bedrock stream alive during inactivity
+    async def keepalive():
+        silence = b"\x00\x00" * 3200  # 100ms of silence at 16kHz 16-bit
+        while stream_manager.is_active:
+            await asyncio.sleep(1)
+            if stream_manager.is_active:
+                stream_manager.add_audio_chunk(silence)
+
+    keepalive_task = asyncio.create_task(keepalive())
+
+    # Close the WebSocket when the Bedrock stream dies
+    async def watch_stream():
+        while stream_manager.is_active:
+            await asyncio.sleep(1)
+        logger.info("Bedrock stream inactive, closing WebSocket")
+        await websocket.close()
+
+    watch_task = asyncio.create_task(watch_stream())
+
     try:
         async for message in websocket:
             try:
@@ -874,8 +897,10 @@ async def websocket_handler(websocket, url, headers=None):
     except websockets.exceptions.ConnectionClosed:
         logger.info("WebSocket connection closed")
     finally:
-        # Clean up the asyncio task
         forward_task.cancel()
+        keepalive_task.cancel()
+        watch_task.cancel()
+        await stream_manager.close()
 
 
 async def forward_responses(websocket, stream_manager):

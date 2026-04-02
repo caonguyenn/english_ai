@@ -42,7 +42,9 @@ export default function App() {
           transcript.startNewMessage('ASSISTANT');
         }
       } else if ('textOutput' in ev) {
-        const { content, additionalModelFields } = ev.textOutput;
+        const { content, role, additionalModelFields } = ev.textOutput;
+        // Only append if role matches the current message being built
+        if (role !== currentContentRoleRef.current) return;
         // Handle barge-in
         if (additionalModelFields) {
           try {
