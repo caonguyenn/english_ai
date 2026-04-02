@@ -14,7 +14,7 @@ export type ServerMessage =
   | { event: { connectionStatus: { status: string; message: string } } }
   | { event: { textOutput: { content: string; role: MessageRole; additionalModelFields?: string } } }
   | { event: { audioOutput: { content: string } } }
-  | { event: { contentStart: { role?: MessageRole; type?: string; contentName?: string; promptName?: string } } }
+  | { event: { contentStart: { role?: MessageRole; type?: 'TEXT' | 'AUDIO' | 'TOOL'; contentName?: string; promptName?: string; additionalModelFields?: string } } }
   | { event: { contentEnd: { contentName?: string; promptName?: string } } }
   | { event: { completionStart: Record<string, unknown> } }
   | { event: { completionEnd: Record<string, unknown> } }

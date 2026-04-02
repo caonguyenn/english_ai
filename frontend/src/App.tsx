@@ -29,14 +29,18 @@ export default function App() {
       } else if ('audioOutput' in ev) {
         playback.enqueueBase64Audio(ev.audioOutput.content);
       } else if ('contentStart' in ev) {
-        const role = ev.contentStart.role;
+        const { role, type, additionalModelFields } = ev.contentStart;
+        let isSpeculative = false;
+        if (additionalModelFields) {
+          try { isSpeculative = JSON.parse(additionalModelFields)?.generationStage === 'SPECULATIVE'; } catch { /* ignore */ }
+        }
         if (role === 'USER') {
           currentContentRoleRef.current = 'USER';
           transcript.startNewMessage('USER');
+        } else if (role === 'ASSISTANT' && type === 'TEXT' && !isSpeculative) {
+          currentContentRoleRef.current = 'ASSISTANT';
+          transcript.startNewMessage('ASSISTANT');
         }
-      } else if ('completionStart' in ev) {
-        currentContentRoleRef.current = 'ASSISTANT';
-        transcript.startNewMessage('ASSISTANT');
       } else if ('textOutput' in ev) {
         const { content, additionalModelFields } = ev.textOutput;
         // Handle barge-in
@@ -49,7 +53,7 @@ export default function App() {
           } catch { /* ignore */ }
         }
         if (content) transcript.appendToCurrentMessage(content);
-      } else if ('completionEnd' in ev || 'contentEnd' in ev) {
+      } else if ('completionEnd' in ev) {
         transcript.finalizeCurrentMessage();
         currentContentRoleRef.current = null;
       }

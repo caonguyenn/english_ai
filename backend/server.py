@@ -389,6 +389,9 @@ class BedrockStreamManager:
                 # Small delay between init events
                 await asyncio.sleep(0.1)
 
+            # Open the audio content block (stays open for the entire session)
+            await self.send_audio_content_start_event()
+
             # Start listening for responses
             self.response_task = asyncio.create_task(self._process_responses())
 
@@ -465,11 +468,7 @@ class BedrockStreamManager:
             except asyncio.CancelledError:
                 break
             except Exception as e:
-                debug_print(f"Error processing audio: {e}")
-                if DEBUG:
-                    import traceback
-
-                    traceback.print_exc()
+                logger.error(f"Error processing audio: {e}", exc_info=True)
 
     def add_audio_chunk(self, audio_bytes):
         """Add an audio chunk to the queue."""
@@ -653,17 +652,13 @@ class BedrockStreamManager:
                     # Stream has ended
                     break
                 except Exception as e:
-                    # Handle ValidationException properly
-                    if "ValidationException" in str(e):
-                        error_message = str(e)
-                        print(f"Validation error: {error_message}")
-                    else:
-                        print(f"Error receiving response: {e}")
+                    logger.error(f"Error receiving Bedrock response: {e}", exc_info=True)
                     break
 
         except Exception as e:
-            print(f"Response processing error: {e}")
+            logger.error(f"Response processing error: {e}", exc_info=True)
         finally:
+            logger.info("Bedrock response stream ended, is_active -> False")
             self.is_active = False
 
     def handle_tool_request(self, tool_name, tool_content, tool_use_id):
@@ -825,6 +820,16 @@ async def websocket_handler(websocket, url, headers=None):
     try:
         async for message in websocket:
             try:
+                if isinstance(message, bytes):
+                    stream_manager.add_audio_chunk(message)
+                    continue
+
+                if message == "close":
+                    break
+
+                if message == "stop":
+                    continue
+
                 data = json.loads(message)
 
                 if "event" in data:
