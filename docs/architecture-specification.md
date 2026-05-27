@@ -578,5 +578,49 @@ A lightweight internal React page to:
 
 ---
 
-*Document version: 1.1 — Auth updated to AWS Cognito*
-*Last updated: April 2026*
+---
+
+## Implementation Status
+
+**Status:** ✓ Complete (May 27, 2026)
+
+The full EnglishAI platform has been successfully implemented across 7 phases:
+
+1. **DB + Backend Foundation** — Docker Compose (Postgres + Redis), all database models, Alembic migrations, seed data (7 modules, 28 classes, 10 topics), Cognito JWKS validation with dev mode bypass
+2. **REST API + Admin Routes** — 27 REST endpoints (auth, students, sessions, modules, playground, admin), Pydantic v2 schemas, service layer, level-up validation with cooldown and min-session checks, admin routes with Cognito groups auth
+3. **WebSocket Server** — Separate FastAPI process (port 8080), BedrockStreamManager for NovaSonic bidirectional streaming, first-message auth pattern, tools (record_skill_score, trigger_level_up), audio format validation (16-bit PCM 16kHz client → 24kHz server)
+4. **Frontend Auth + Store** — Cognito auth flow with AccessToken in memory + RefreshToken in HttpOnly cookie, Zustand stores (authStore, sessionStore), axios API service with 401 retry queue, React Router with protected/admin route guards
+5. **Frontend Student Pages** — 8 student pages (Dashboard, Modules, ClassRoom, Playground, Placement, Profile + session pages), layout components (AppShell, Sidebar, TopBar), GSAP mount animations per FRONTEND.md
+6. **Admin UI** — 4 admin pages (StudentList, StudentDetail, StudentSessions, StudentAuditLog), paginated data tables with search, edit forms for XP/module/band, Cognito admin group guard
+7. **Integration + Celery** — WebSocket ↔ Frontend session lifecycle wired, prompt builder fetches real student context via REST API, tool handler persists scores + validates level-ups, Celery async summarization task, playground XP daily cap enforced, level-up events forwarded to frontend
+
+### Key Architecture Decisions Implemented
+
+- **First-Message WebSocket Auth**: Browser WebSocket API cannot set custom headers; auth token sent in first JSON frame after `accept()` (Red Team Finding #4)
+- **Dev Mode JWKS Bypass**: `ENVIRONMENT=development` skips JWT validation entirely when JWKS fetch fails, allows local dev without Cognito (Red Team Finding #3)
+- **Internal Level-Up Security**: `POST /sessions/{id}/level-up` protected by `X-Internal-Secret` header (env var), not student token, prevents self-promotion (Red Team Finding #9)
+- **Sync Celery Engine**: Celery tasks use sync SQLAlchemy engine to avoid `asyncio.run()` conflicts with async app event loop (Red Team Finding #7)
+- **Playground XP Cap**: Daily XP from playground capped at 60% of module threshold, enforced with `SELECT FOR UPDATE` to prevent concurrent-session double-award (Red Team Finding #8)
+- **Token Expiry Mitigation**: 45-min max session duration enforced server-side; Cognito tokens expire after 1hr, deferred WS refresh complexity for MVP (Validation Session answer #1)
+
+### All Red Team Findings Accepted and Fixed
+
+15 critical/high severity findings from parallel red team session (May 27, 2026) have been incorporated into implementation:
+- Database mutation isolation (Finding #1)
+- Session ID propagation (Finding #2)
+- JWKS retry + dev fallback (Finding #3)
+- WS auth before Bedrock (Finding #4)
+- Idempotent placement confirmation (Finding #5)
+- JWT error handling (Finding #6)
+- Celery event loop (Finding #7)
+- Playground XP race condition (Finding #8)
+- Level-up endpoint security (Finding #9)
+- Prompt builder HTTP timeouts (Finding #10)
+- Transcript ownership validation (Finding #11)
+- Admin list pagination cap (Finding #12)
+- Module change audit logging (Finding #13)
+- Access token expiry in WS (Finding #14)
+- Session creation cleanup (Finding #15)
+
+*Document version: 1.2 — Implementation complete*
+*Last updated: May 27, 2026*
