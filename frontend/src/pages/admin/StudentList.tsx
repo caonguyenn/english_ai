@@ -8,10 +8,10 @@ import type { Column } from '../../components/admin/DataTable';
 import type { ModuleResponse } from '../../types';
 
 interface AdminStudent {
-  id: number;
+  id: string;
   name: string | null;
   email: string;
-  current_module_id: number | null;
+  current_module_id: string | null;
   placement_band: number | null;
   xp_total: number;
   created_at: string;
@@ -89,7 +89,7 @@ export default function StudentList() {
       render: (row) => {
         if (!row.current_module_id || !modulesData) return <span style={{ color: 'var(--muted)' }}>—</span>;
         const mod = modulesData.find((m) => m.id === row.current_module_id);
-        return mod ? `${mod.order_index}. ${mod.title}` : String(row.current_module_id);
+        return mod ? `${mod.order_index}. ${mod.title}` : row.current_module_id;
       },
     },
     {

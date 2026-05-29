@@ -1,5 +1,6 @@
 """Admin routes — student management, session history, audit log."""
 from typing import Any
+from uuid import UUID
 
 from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy import select
@@ -24,7 +25,7 @@ router = APIRouter(
 @router.get("/students", response_model=list[AdminStudentResponse])
 async def list_students(
     q: str | None = Query(default=None, description="Search by name or email"),
-    module_id: int | None = Query(default=None),
+    module_id: UUID | None = Query(default=None),
     band_min: float | None = Query(default=None),
     band_max: float | None = Query(default=None),
     limit: int = Query(default=20, ge=1, le=100),  # Red Team Fix #12 — hard cap 100
@@ -44,7 +45,7 @@ async def list_students(
     if band_max is not None:
         query = query.where(Student.placement_band <= band_max)
 
-    query = query.order_by(Student.id.asc()).offset(offset).limit(limit)
+    query = query.order_by(Student.created_at.asc()).offset(offset).limit(limit)
     result = await db.execute(query)
     students = result.scalars().all()
     return [AdminStudentResponse.model_validate(s) for s in students]
@@ -52,7 +53,7 @@ async def list_students(
 
 @router.get("/students/{student_id}", response_model=AdminStudentResponse)
 async def get_student(
-    student_id: int,
+    student_id: UUID,
     db: AsyncSession = Depends(get_db),
 ) -> AdminStudentResponse:
     student = await db.get(Student, student_id)
@@ -63,7 +64,7 @@ async def get_student(
 
 @router.put("/students/{student_id}", response_model=AdminStudentResponse)
 async def edit_student(
-    student_id: int,
+    student_id: UUID,
     body: AdminStudentEdit,
     db: AsyncSession = Depends(get_db),
     admin_claims: dict[str, Any] = Depends(require_admin),
@@ -113,7 +114,7 @@ async def edit_student(
 
 @router.get("/students/{student_id}/sessions", response_model=list[AdminSessionResponse])
 async def get_student_sessions(
-    student_id: int,
+    student_id: UUID,
     limit: int = Query(default=20, ge=1, le=100),
     offset: int = Query(default=0, ge=0),
     db: AsyncSession = Depends(get_db),
@@ -135,7 +136,7 @@ async def get_student_sessions(
 
 @router.get("/students/{student_id}/audit-log", response_model=list[AuditLogEntry])
 async def get_student_audit_log(
-    student_id: int,
+    student_id: UUID,
     db: AsyncSession = Depends(get_db),
 ) -> list[AuditLogEntry]:
     student = await db.get(Student, student_id)

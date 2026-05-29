@@ -11,12 +11,12 @@ import { MicButton } from '../components/MicButton';
 import type { Message } from '../types';
 
 interface SessionCreateResponse {
-  id: number;
+  id: string;
 }
 
 interface PlacementResult {
   band: number;
-  moduleId: number;
+  moduleId: string;
   moduleTitle: string;
 }
 
@@ -29,10 +29,10 @@ function PlacementStepper({ current }: { current: number }) {
         color: 'var(--text-secondary)',
         whiteSpace: 'nowrap',
       }}>
-        Question {current} of 8
+        Question {current} of 6
       </span>
       <div style={{ display: 'flex', gap: 5, marginLeft: 8 }}>
-        {Array.from({ length: 8 }).map((_, i) => (
+        {Array.from({ length: 6 }).map((_, i) => (
           <div
             key={i}
             style={{
@@ -60,12 +60,14 @@ export default function PlacementSession() {
   const [questionIndex, setQuestionIndex] = useState(1);
   const [result, setResult] = useState<PlacementResult | null>(null);
   const [isConfirming, setIsConfirming] = useState(false);
-  const [sessionId, setSessionId] = useState<number | null>(null);
+  const [sessionId, setSessionId] = useState<string | null>(null);
   const [micActive, setMicActive] = useState(false);
+  // Half-duplex gate — suppress mic while AI is speaking
+  const aiSpeakingRef = useRef(false);
 
   // Create placement session on mount then connect WebSocket
   useEffect(() => {
-    let createdId: number | null = null;
+    let createdId: string | null = null;
 
     async function createSession() {
       try {
@@ -86,15 +88,20 @@ export default function PlacementSession() {
             for (let i = 0; i < bytes.length; i++) bin += String.fromCharCode(bytes[i]);
             enqueueBase64Audio(btoa(bin));
           },
-          onTextOutput: (text, role) => {
-            const msgRole = role === 'USER' ? 'USER' : 'ASSISTANT';
-            startNewMessage(msgRole);
-            appendToCurrentMessage(text);
+          onAiSpeakingChange: (speaking) => {
+            aiSpeakingRef.current = speaking;
+          },
+          onContentStart: (role) => {
+            startNewMessage(role === 'USER' ? 'USER' : 'ASSISTANT');
+          },
+          onContentEnd: () => {
             finalizeCurrentMessage();
           },
+          onTextOutput: (text) => {
+            appendToCurrentMessage(text);
+          },
           onLevelUp: (data) => {
-            // Placement uses the level-up event to signal assessment completion
-            // band comes from the WS event; module info from to_module fields
+            if (!data.to_module_id) return;
             setResult({
               band: data.band,
               moduleId: data.to_module_id,
@@ -141,7 +148,7 @@ export default function PlacementSession() {
   useEffect(() => {
     const aiMessages = messages.filter((m) => m.role === 'ASSISTANT' && !m.isStreaming);
     if (aiMessages.length > 0) {
-      setQuestionIndex(Math.min(aiMessages.length + 1, 8));
+      setQuestionIndex(Math.min(aiMessages.length + 1, 6));
     }
   }, [messages]);
 
@@ -152,7 +159,12 @@ export default function PlacementSession() {
       setMicActive(false);
     } else {
       void startCapture(
-        (pcm) => wsRef.current?.sendAudio(pcm),
+        (pcm) => {
+          // Half-duplex: drop frames while AI is speaking
+          if (!aiSpeakingRef.current) {
+            wsRef.current?.sendAudio(pcm);
+          }
+        },
         () => { /* VAD silence callback */ },
       );
       setMicActive(true);

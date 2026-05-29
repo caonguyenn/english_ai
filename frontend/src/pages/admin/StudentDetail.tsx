@@ -6,12 +6,12 @@ import { EditStudentForm } from '../../components/admin/EditStudentForm';
 import type { ModuleResponse } from '../../types';
 
 interface AdminStudentDetail {
-  id: number;
+  id: string;
   cognito_sub: string;
   name: string | null;
   email: string;
   xp_total: number;
-  current_module_id: number | null;
+  current_module_id: string | null;
   placement_band: number | null;
   placement_completed_at: string | null;
   created_at: string;
@@ -19,7 +19,7 @@ interface AdminStudentDetail {
 
 interface UpdateStudentPayload {
   xp_total?: number;
-  current_module_id?: number;
+  current_module_id?: string;
   placement_band?: number;
 }
 
@@ -46,7 +46,7 @@ export default function StudentDetail() {
     },
   });
 
-  const mutation = useMutation<AdminStudentDetail, unknown, UpdateStudentPayload>({
+  const mutation = useMutation<AdminStudentDetail, unknown, UpdateStudentPayload>({ // eslint-disable-line @typescript-eslint/no-explicit-any
     mutationFn: async (payload) => {
       const res = await api.put<AdminStudentDetail>(`/admin/students/${id}`, payload);
       return res.data;

@@ -1,5 +1,6 @@
 """Student-related Pydantic v2 schemas."""
 from datetime import datetime
+from uuid import UUID
 
 from pydantic import BaseModel
 
@@ -10,7 +11,7 @@ class StudentUpdate(BaseModel):
 
 class StudentProgress(BaseModel):
     xp_total: int
-    current_module_id: int | None
+    current_module_id: UUID | None
     current_module_title: str | None
     xp_in_module: int
     xp_threshold: int
@@ -18,9 +19,9 @@ class StudentProgress(BaseModel):
 
 
 class AuditLogEntry(BaseModel):
-    id: int
-    from_module_id: int
-    to_module_id: int
+    id: UUID
+    from_module_id: UUID | None
+    to_module_id: UUID
     from_module_title: str | None
     to_module_title: str | None
     reason_text: str | None
@@ -31,12 +32,12 @@ class AuditLogEntry(BaseModel):
 
 
 class StudentHistory(BaseModel):
-    id: int
+    id: UUID
     session_type: str
     started_at: datetime
     ended_at: datetime | None
     xp_awarded: int
-    class_id: int | None
-    topic_id: int | None
+    class_id: UUID | None
+    topic_id: UUID | None
 
     model_config = {"from_attributes": True}

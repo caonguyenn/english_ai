@@ -1,15 +1,16 @@
 """Auth-related Pydantic v2 schemas."""
 from datetime import datetime
+from uuid import UUID
 
 from pydantic import BaseModel, computed_field
 
 
 class StudentProfile(BaseModel):
-    id: int
+    id: UUID
     cognito_sub: str
     name: str | None
     email: str
-    current_module_id: int | None
+    current_module_id: UUID | None
     placement_band: float | None
     xp_total: int
     placement_completed_at: datetime | None
@@ -23,7 +24,7 @@ class StudentProfile(BaseModel):
 
 
 class ConfirmPlacementRequest(BaseModel):
-    module_id: int
+    module_id: UUID
     placement_band: float
 
 

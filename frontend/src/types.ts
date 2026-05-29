@@ -3,11 +3,11 @@ export type ConnectionStatus = 'disconnected' | 'connecting' | 'connected' | 'er
 // ── Auth & Domain Types ───────────────────────────────────────────────────────
 
 export interface StudentProfile {
-  id: number;
+  id: string;
   cognito_sub: string;
   name: string | null;
   email: string;
-  current_module_id: number | null;
+  current_module_id: string | null;
   placement_band: number | null;
   xp_total: number;
   placement_completed_at: string | null;
@@ -21,27 +21,26 @@ export interface AuthState {
   isLoading: boolean;
   setAccessToken: (token: string) => void;
   setProfile: (profile: StudentProfile) => void;
-  refreshToken: () => Promise<void>;
   logout: () => void;
   initialize: () => Promise<void>;
 }
 
 export interface SessionState {
-  sessionId: number | null;
+  sessionId: string | null;
   sessionType: 'class' | 'playground' | 'placement' | null;
-  refId: number | null;
+  refId: string | null;
   isActive: boolean;
   startedAt: string | null;
   xpEarned: number;
   wsConnected: boolean;
-  setSession: (id: number, type: string, refId: number | null) => void;
+  setSession: (id: string, type: string, refId: string | null) => void;
   endSession: () => void;
   addXp: (amount: number) => void;
   setWsConnected: (connected: boolean) => void;
 }
 
 export interface ModuleResponse {
-  id: number;
+  id: string;
   band_min: number;
   band_max: number;
   title: string;
@@ -50,9 +49,14 @@ export interface ModuleResponse {
   order_index: number;
 }
 
+export interface ModuleWithProgress extends ModuleResponse {
+  xp_earned: number;
+  enrolled: boolean;
+}
+
 export interface ClassResponse {
-  id: number;
-  module_id: number;
+  id: string;
+  module_id: string;
   title: string;
   skill_type: string;
   description: string;
@@ -62,10 +66,10 @@ export interface ClassResponse {
 }
 
 export interface SessionResponse {
-  id: number;
-  student_id: number;
-  class_id: number | null;
-  topic_id: number | null;
+  id: string;
+  student_id: string;
+  class_id: string | null;
+  topic_id: string | null;
   session_type: string;
   started_at: string;
   ended_at: string | null;
@@ -73,7 +77,7 @@ export interface SessionResponse {
 }
 
 export interface PlaygroundTopic {
-  id: number;
+  id: string;
   slug: string;
   title: string;
   description: string;
@@ -97,7 +101,7 @@ export interface Message {
 export interface LevelUpEvent {
   from_module: string;
   to_module: string;
-  to_module_id: number;
+  to_module_id: string | null;
   band: number;
 }
 

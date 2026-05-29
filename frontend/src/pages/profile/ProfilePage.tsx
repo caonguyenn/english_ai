@@ -7,7 +7,7 @@ import AppShell from '../../components/layout/AppShell';
 
 interface ProgressResponse {
   xp_total: number;
-  current_module_id: number | null;
+  current_module_id: string | null;
   weak_areas: string[];
   skill_averages: Record<string, number>;
   total_sessions: number;
@@ -15,9 +15,9 @@ interface ProgressResponse {
 }
 
 interface AuditEntry {
-  id: number;
-  from_module_id: number;
-  to_module_id: number;
+  id: string;
+  from_module_id: string | null;
+  to_module_id: string;
   reason_text: string;
   created_at: string;
   from_module_title?: string;

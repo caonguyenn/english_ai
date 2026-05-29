@@ -19,9 +19,9 @@ from app.config import settings
 
 logger = logging.getLogger(__name__)
 
-REST_BASE = settings.REST_BASE_URL
+REST_BASE = f"{settings.REST_BASE_URL}/api/v1"
 
-_VALID_SKILLS = frozenset({"speaking", "listening", "grammar", "pronunciation"})
+_VALID_SKILLS = frozenset({"speaking", "listening", "grammar", "pronunciation", "vocabulary"})
 
 # Async callback type: called when a level-up is approved so the WS route can
 # forward the event to the frontend without coupling bedrock_stream to the WS.
@@ -34,11 +34,12 @@ class ToolHandler:
     def __init__(
         self,
         student_sub: str,
-        session_id: int,
+        session_id: str,
         session_type: str,
-        ref_id: int | None,
+        ref_id: str | None,
         token: str,
         on_level_up: LevelUpCallback | None = None,
+        on_complete: LevelUpCallback | None = None,
     ) -> None:
         self.student_sub = student_sub
         self.session_id = session_id
@@ -46,12 +47,15 @@ class ToolHandler:
         self.ref_id = ref_id
         self.token = token
         self.on_level_up = on_level_up
+        self.on_complete = on_complete
         self.recorded_scores: list[dict] = []
 
     async def process_tool(self, tool_name: str, tool_input: dict) -> dict:
         """Dispatch a tool call from NovaSonic. Returns result dict, never raises."""
         if tool_name == "record_skill_score":
             return await self._record_skill_score(tool_input)
+        if tool_name == "complete_class":
+            return await self._complete_class(tool_input)
         if tool_name == "trigger_level_up":
             return await self._trigger_level_up(tool_input)
         logger.warning("Unknown tool called: %s", tool_name)
@@ -94,6 +98,42 @@ class ToolHandler:
             logger.error("record_skill_score failed: %s", exc)
             return {"error": str(exc)}
 
+    async def _complete_class(self, input_data: dict) -> dict:
+        """Mark a class session complete and award its XP via REST (internal secret).
+
+        Only valid for class sessions; the server determines the XP amount from the
+        class definition (the model does not choose XP).
+        """
+        if self.session_type != "class":
+            return {"error": "complete_class is only valid for class sessions"}
+
+        reason = input_data.get("reason", "")
+        internal_headers = {"X-Internal-Secret": settings.INTERNAL_SECRET}
+        try:
+            async with httpx.AsyncClient(base_url=REST_BASE, timeout=5.0) as client:
+                resp = await client.post(
+                    f"/sessions/{self.session_id}/complete",
+                    json={"reason": reason, "student_sub": self.student_sub},
+                    headers=internal_headers,
+                )
+            if resp.status_code >= 500:
+                logger.error("complete_class REST error %s: %s", resp.status_code, resp.text)
+                return {"error": f"REST error {resp.status_code}"}
+            result: dict = resp.json()
+            logger.info(
+                "complete_class — session=%s xp_awarded=%s",
+                self.session_id, result.get("xp_awarded"),
+            )
+            if result.get("completed") and self.on_complete:
+                try:
+                    await self.on_complete(result)
+                except Exception as cb_exc:
+                    logger.error("on_complete callback failed: %s", cb_exc)
+            return result
+        except Exception as exc:
+            logger.error("complete_class failed: %s", exc)
+            return {"error": str(exc)}
+
     async def _trigger_level_up(self, input_data: dict) -> dict:
         """Validate level-up via REST POST /sessions/{id}/level-up (internal secret)."""
         reason = input_data.get("reason", "")
@@ -111,6 +151,9 @@ class ToolHandler:
                     },
                     headers=internal_headers,
                 )
+            if resp.status_code >= 500:
+                logger.error("trigger_level_up REST error %s: %s", resp.status_code, resp.text)
+                return {"error": f"REST error {resp.status_code}"}
             result: dict = resp.json()
             logger.info(
                 "trigger_level_up — session=%s approved=%s reason=%s",

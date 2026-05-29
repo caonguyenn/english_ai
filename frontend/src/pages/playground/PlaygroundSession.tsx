@@ -14,7 +14,7 @@ import SessionSummary from '../../components/session/SessionSummary';
 import type { PlaygroundTopic, Message } from '../../types';
 
 interface SessionCreateResponse {
-  id: number;
+  id: string;
 }
 
 const TOPIC_EMOJIS: Record<string, string> = {
@@ -42,6 +42,8 @@ export default function PlaygroundSession() {
   const [showSummary, setShowSummary] = useState(false);
   const [sessionCreated, setSessionCreated] = useState(false);
   const [micActive, setMicActive] = useState(false);
+  // Half-duplex gate — suppress mic while AI is speaking
+  const aiSpeakingRef = useRef(false);
 
   const { data: topics } = useQuery<PlaygroundTopic[]>({
     queryKey: ['topics'],
@@ -54,7 +56,7 @@ export default function PlaygroundSession() {
   // Create session then connect WebSocket once topic id is available
   useEffect(() => {
     if (!topic || sessionCreated) return;
-    let sessionId: number | null = null;
+    let sessionId: string | null = null;
 
     async function createSession() {
       if (!topic) return;
@@ -77,11 +79,17 @@ export default function PlaygroundSession() {
             for (let i = 0; i < bytes.length; i++) bin += String.fromCharCode(bytes[i]);
             enqueueBase64Audio(btoa(bin));
           },
-          onTextOutput: (text, role) => {
-            const msgRole = role === 'USER' ? 'USER' : 'ASSISTANT';
-            startNewMessage(msgRole);
-            appendToCurrentMessage(text);
+          onAiSpeakingChange: (speaking) => {
+            aiSpeakingRef.current = speaking;
+          },
+          onContentStart: (role) => {
+            startNewMessage(role === 'USER' ? 'USER' : 'ASSISTANT');
+          },
+          onContentEnd: () => {
             finalizeCurrentMessage();
+          },
+          onTextOutput: (text) => {
+            appendToCurrentMessage(text);
           },
           onLevelUp: () => { /* playground sessions do not trigger level-up */ },
           onConnectionStatus: (status) => {
@@ -127,7 +135,12 @@ export default function PlaygroundSession() {
       setMicActive(false);
     } else {
       void startCapture(
-        (pcm) => wsRef.current?.sendAudio(pcm),
+        (pcm) => {
+          // Half-duplex: drop frames while AI is speaking
+          if (!aiSpeakingRef.current) {
+            wsRef.current?.sendAudio(pcm);
+          }
+        },
         () => { /* VAD silence callback */ },
       );
       setMicActive(true);

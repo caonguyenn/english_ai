@@ -1,16 +1,18 @@
 """Module and class queries with enrollment progress overlay."""
+from uuid import UUID
+
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.db.models.module import Class, Enrollment, Module
-from app.db.models.session import Session, SessionType
+from app.db.models.session import Session, SessionType, SkillScore
 from app.schemas.module import ClassResponse, ModuleWithProgressResponse
 
 
 class ModuleService:
     @staticmethod
     async def list_modules(
-        db: AsyncSession, student_id: int
+        db: AsyncSession, student_id: UUID
     ) -> list[ModuleWithProgressResponse]:
         """Return all modules with student enrollment XP overlay."""
         modules_result = await db.execute(
@@ -40,12 +42,12 @@ class ModuleService:
         ]
 
     @staticmethod
-    async def get_module(db: AsyncSession, module_id: int) -> Module | None:
+    async def get_module(db: AsyncSession, module_id: UUID) -> Module | None:
         return await db.get(Module, module_id)
 
     @staticmethod
     async def list_classes(
-        db: AsyncSession, module_id: int, student_id: int
+        db: AsyncSession, module_id: UUID, student_id: UUID
     ) -> list[ClassResponse]:
         """Return classes for a module, with completed flag per student."""
         classes_result = await db.execute(
@@ -55,9 +57,12 @@ class ModuleService:
         )
         classes = classes_result.scalars().all()
 
-        # Find which class_ids have at least one completed session for this student
+        # A class counts as completed only when the student actually engaged with it:
+        # the session must have ended AND have at least one recorded skill score.
         completed_result = await db.execute(
-            select(Session.class_id).where(
+            select(Session.class_id)
+            .join(SkillScore, SkillScore.session_id == Session.id)
+            .where(
                 Session.student_id == student_id,
                 Session.session_type == SessionType.class_,
                 Session.class_id.in_([c.id for c in classes]),

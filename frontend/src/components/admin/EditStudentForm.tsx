@@ -1,16 +1,16 @@
 import { useState } from 'react';
 
 interface AdminStudentData {
-  id: number;
+  id: string;
   name: string | null;
   email: string;
   xp_total: number;
-  current_module_id: number | null;
+  current_module_id: string | null;
   placement_band: number | null;
 }
 
 interface Module {
-  id: number;
+  id: string;
   title: string;
   order_index: number;
 }
@@ -18,7 +18,7 @@ interface Module {
 interface EditStudentFormProps {
   student: AdminStudentData;
   modules: Module[];
-  onSave: (data: { xp_total?: number; current_module_id?: number; placement_band?: number }) => void;
+  onSave: (data: { xp_total?: number; current_module_id?: string; placement_band?: number }) => void;
   isSaving: boolean;
 }
 
@@ -56,10 +56,10 @@ export function EditStudentForm({ student, modules, onSave, isSaving }: EditStud
     e.preventDefault();
     if (!validate()) return;
 
-    const payload: { xp_total?: number; current_module_id?: number; placement_band?: number } = {};
+    const payload: { xp_total?: number; current_module_id?: string; placement_band?: number } = {};
 
     payload.xp_total = Number(xpTotal);
-    if (moduleId !== '') payload.current_module_id = Number(moduleId);
+    if (moduleId !== '') payload.current_module_id = moduleId;
     if (band !== '') payload.placement_band = Number(band);
 
     onSave(payload);

@@ -1,11 +1,12 @@
 """Student business logic — all DB mutations go through here."""
 from datetime import datetime
+from uuid import UUID
 
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.db.models.level_audit import LevelAuditLog
-from app.db.models.module import Module
+from app.db.models.module import Class as ClassModel, Module
 from app.db.models.session import Session, SkillScore
 from app.db.models.student import Student
 from app.schemas.student import AuditLogEntry, StudentHistory, StudentProgress
@@ -47,11 +48,14 @@ class StudentService:
                 module_title = module.title
                 xp_threshold = module.xp_threshold
 
-            # Sum XP earned in current module via sessions
+            # Sum XP from class sessions in the student's current module only
             xp_result = await db.execute(
-                select(func.coalesce(func.sum(Session.xp_awarded), 0)).where(
+                select(func.coalesce(func.sum(Session.xp_awarded), 0))
+                .join(ClassModel, ClassModel.id == Session.class_id)
+                .where(
                     Session.student_id == student.id,
                     Session.ended_at.isnot(None),
+                    ClassModel.module_id == student.current_module_id,
                 )
             )
             xp_in_module = xp_result.scalar_one() or 0
@@ -68,7 +72,7 @@ class StudentService:
         )
 
     @staticmethod
-    async def _get_weak_areas(db: AsyncSession, student_id: int) -> list[str]:
+    async def _get_weak_areas(db: AsyncSession, student_id: UUID) -> list[str]:
         """Return skills with avg score below 70 across last 10 sessions."""
         result = await db.execute(
             select(SkillScore.skill, func.avg(SkillScore.score).label("avg_score"))
@@ -81,7 +85,7 @@ class StudentService:
 
     @staticmethod
     async def get_history(
-        db: AsyncSession, student_id: int, limit: int = 20, offset: int = 0
+        db: AsyncSession, student_id: UUID, limit: int = 20, offset: int = 0
     ) -> list[StudentHistory]:
         result = await db.execute(
             select(Session)
@@ -95,7 +99,7 @@ class StudentService:
 
     @staticmethod
     async def get_audit_log(
-        db: AsyncSession, student_id: int
+        db: AsyncSession, student_id: UUID
     ) -> list[AuditLogEntry]:
         result = await db.execute(
             select(LevelAuditLog)
@@ -105,8 +109,8 @@ class StudentService:
         entries = result.scalars().all()
 
         # Resolve module titles in one batch
-        module_ids = {e.from_module_id for e in entries} | {e.to_module_id for e in entries}
-        titles: dict[int, str] = {}
+        module_ids = {e.from_module_id for e in entries if e.from_module_id is not None} | {e.to_module_id for e in entries if e.to_module_id is not None}
+        titles: dict[UUID, str] = {}
         if module_ids:
             mod_result = await db.execute(
                 select(Module.id, Module.title).where(Module.id.in_(module_ids))

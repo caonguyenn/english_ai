@@ -10,7 +10,7 @@ export const useSessionStore = create<SessionState>((set) => ({
   xpEarned: 0,
   wsConnected: false,
 
-  setSession: (id: number, type: string, refId: number | null) =>
+  setSession: (id: string, type: string, refId: string | null) =>
     set({
       sessionId: id,
       sessionType: type as SessionState['sessionType'],

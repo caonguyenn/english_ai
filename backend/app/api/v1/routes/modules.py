@@ -1,4 +1,6 @@
 """Module and class listing routes."""
+from uuid import UUID
+
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -20,7 +22,7 @@ async def list_modules(
 
 @router.get("/{module_id}", response_model=ModuleResponse)
 async def get_module(
-    module_id: int,
+    module_id: UUID,
     _: Student = Depends(get_current_student),
     db: AsyncSession = Depends(get_db),
 ) -> ModuleResponse:
@@ -32,7 +34,7 @@ async def get_module(
 
 @router.get("/{module_id}/classes", response_model=list[ClassResponse])
 async def list_classes(
-    module_id: int,
+    module_id: UUID,
     current: Student = Depends(get_current_student),
     db: AsyncSession = Depends(get_db),
 ) -> list[ClassResponse]:

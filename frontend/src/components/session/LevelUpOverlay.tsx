@@ -4,7 +4,7 @@ import { TrendingUp } from 'lucide-react';
 
 interface LevelUpOverlayProps {
   fromModule: string;
-  toModuleId: number;
+  toModuleId: string | null;
   toModuleTitle: string;
   sessionsCompleted: number;
   avgScore: number;

@@ -2,7 +2,7 @@
  * SessionWebSocket — plain class (not a hook) that manages a single NovaSonic session.
  *
  * Auth: first-message pattern — browser WebSocket API cannot set custom headers.
- * After onopen, sends {"type":"auth","token":"...","session_id":N} before any audio.
+ * After onopen, sends {"type":"auth","token":"...","session_id":"<uuid>"} before any audio.
  */
 import { useAuthStore } from '../store/authStore';
 
@@ -12,29 +12,44 @@ const WS_BASE_URL =
 export interface LevelUpData {
   from_module: string;
   to_module: string;
-  to_module_id: number;
+  to_module_id: string | null;
   band: number;
+}
+
+export interface ClassCompleteData {
+  xp_awarded: number;
+  class_title: string;
+  reason: string;
 }
 
 export interface SessionWebSocketConfig {
   sessionType: 'class' | 'playground' | 'placement';
-  refId: number | null;
+  refId: string | null;
   onAudioOutput: (audioBytes: ArrayBuffer) => void;
   onTextOutput: (text: string, role: string) => void;
+  onContentStart: (role: string) => void;
+  onContentEnd: () => void;
   onLevelUp: (data: LevelUpData) => void;
+  onClassComplete?: (data: ClassCompleteData) => void;
   onConnectionStatus: (status: string) => void;
   onError: (error: string) => void;
+  /** Called with true when AI audio starts, false when it fully ends (completionEnd). */
+  onAiSpeakingChange?: (speaking: boolean) => void;
 }
 
 export class SessionWebSocket {
   private ws: WebSocket | null = null;
   private readonly config: SessionWebSocketConfig;
+  // NovaSonic sends text twice per ASSISTANT turn: SPECULATIVE then FINAL.
+  // Track contentStart metadata so we only forward the speculative pass to the UI.
+  private currentRole: string = '';
+  private isSpeculative: boolean = false;
 
   constructor(config: SessionWebSocketConfig) {
     this.config = config;
   }
 
-  connect(sessionId: number): void {
+  connect(sessionId: string): void {
     const token = useAuthStore.getState().accessToken;
     if (!token) {
       this.config.onError('Not authenticated');
@@ -43,7 +58,7 @@ export class SessionWebSocket {
 
     const params = new URLSearchParams({ type: this.config.sessionType });
     if (this.config.refId !== null) {
-      params.set('ref_id', String(this.config.refId));
+      params.set('ref_id', this.config.refId);
     }
 
     const url = `${WS_BASE_URL}/ws/session?${params.toString()}`;
@@ -112,9 +127,27 @@ export class SessionWebSocket {
     if (evt['connectionStatus']) {
       const cs = evt['connectionStatus'] as { status: string };
       this.config.onConnectionStatus(cs.status);
+    } else if (evt['contentStart']) {
+      const cs = evt['contentStart'] as { role?: string; type?: string; additionalModelFields?: string };
+      this.currentRole = cs.role ?? '';
+      // Detect SPECULATIVE generation stage — only that pass contains the display text
+      try {
+        const extra = cs.additionalModelFields ? JSON.parse(cs.additionalModelFields) as Record<string, unknown> : {};
+        this.isSpeculative = extra['generationStage'] === 'SPECULATIVE';
+      } catch {
+        this.isSpeculative = false;
+      }
+      // Open a new transcript bubble for TEXT content on the SPECULATIVE pass (ASSISTANT) or USER turn
+      if (cs.type === 'TEXT' && (this.currentRole === 'USER' || this.isSpeculative)) {
+        this.config.onContentStart(this.currentRole);
+      }
+    } else if (evt['contentEnd']) {
+      // Close the current bubble
+      this.config.onContentEnd();
     } else if (evt['audioOutput']) {
+      // AI audio arrived — signal half-duplex gate
+      this.config.onAiSpeakingChange?.(true);
       const ao = evt['audioOutput'] as { content: string };
-      // Base64-encoded PCM — decode to ArrayBuffer
       try {
         const binary = atob(ao.content);
         const bytes = new Uint8Array(binary.length);
@@ -125,12 +158,23 @@ export class SessionWebSocket {
       } catch {
         // ignore malformed audio frames
       }
+    } else if (evt['completionEnd']) {
+      // AI turn fully finished — release half-duplex gate
+      this.config.onAiSpeakingChange?.(false);
     } else if (evt['textOutput']) {
       const to = evt['textOutput'] as { content: string; role: string };
-      this.config.onTextOutput(to.content, to.role);
+      // Skip interrupted barge-in markers
+      if (to.content.includes('"interrupted"')) return;
+      // ASSISTANT text: only forward the SPECULATIVE pass; ignore FINAL (raw transcript duplicate)
+      // USER text: always forward
+      if (this.currentRole === 'ASSISTANT' && !this.isSpeculative) return;
+      this.config.onTextOutput(to.content, to.role ?? this.currentRole);
     } else if (evt['levelUp']) {
       const lu = evt['levelUp'] as LevelUpData;
       this.config.onLevelUp(lu);
+    } else if (evt['classComplete']) {
+      const cc = evt['classComplete'] as ClassCompleteData;
+      this.config.onClassComplete?.(cc);
     }
     // contentStart / contentEnd / completionStart / completionEnd / toolUse / usageEvent
     // are handled server-side; no frontend action needed for MVP

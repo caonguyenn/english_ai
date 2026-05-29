@@ -1,6 +1,7 @@
 """Session-related Pydantic v2 schemas."""
 from datetime import datetime
 from typing import Any
+from uuid import UUID
 
 from pydantic import BaseModel, Field, field_validator
 
@@ -9,8 +10,8 @@ MAX_TRANSCRIPT_SIZE = 1_048_576  # 1 MB — Red Team Fix #11
 
 class SessionCreate(BaseModel):
     session_type: str  # class | playground | placement
-    class_id: int | None = None
-    topic_id: int | None = None
+    class_id: UUID | None = None
+    topic_id: UUID | None = None
 
     @field_validator("session_type")
     @classmethod
@@ -36,21 +37,21 @@ class SkillScoreCreate(BaseModel):
     @field_validator("skill")
     @classmethod
     def validate_skill(cls, v: str) -> str:
-        allowed = {"speaking", "listening", "grammar", "pronunciation"}
+        allowed = {"speaking", "listening", "grammar", "pronunciation", "vocabulary"}
         if v not in allowed:
             raise ValueError(f"skill must be one of {allowed}")
         return v
 
 
 class SessionResponse(BaseModel):
-    id: int
-    student_id: int
-    class_id: int | None
-    topic_id: int | None
+    id: UUID
+    student_id: UUID
+    class_id: UUID | None
+    topic_id: UUID | None
     session_type: str
     started_at: datetime
     ended_at: datetime | None
-    xp_awarded: int
+    xp_awarded: int = 0
 
     model_config = {"from_attributes": True}
 
@@ -59,4 +60,10 @@ class LevelUpRequest(BaseModel):
     """Internal endpoint body — identifies student by sub, not by auth token."""
     reason: str
     evidence: dict
+    student_sub: str
+
+
+class ClassCompleteRequest(BaseModel):
+    """Internal endpoint body for class completion — student identified by sub."""
+    reason: str
     student_sub: str

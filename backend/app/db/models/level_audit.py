@@ -1,27 +1,27 @@
 from datetime import datetime
 from typing import Any
+from uuid import UUID
 
-from sqlalchemy import DateTime, ForeignKey, Integer, JSON, Text, func
+from sqlalchemy import DateTime, ForeignKey, JSON, Text, Uuid, func
 from sqlalchemy.orm import Mapped, mapped_column
 
-from app.db.base import Base
+from app.db.base import Base, UUIDPrimaryKey
 
 
-class LevelAuditLog(Base):
+class LevelAuditLog(UUIDPrimaryKey, Base):
     __tablename__ = "level_audit_log"
 
-    id: Mapped[int] = mapped_column(Integer, primary_key=True)
-    student_id: Mapped[int] = mapped_column(
-        Integer, ForeignKey("students.id", ondelete="CASCADE"), nullable=False, index=True
+    student_id: Mapped[UUID] = mapped_column(
+        Uuid, ForeignKey("students.id", ondelete="CASCADE"), nullable=False, index=True
     )
-    from_module_id: Mapped[int] = mapped_column(
-        Integer, ForeignKey("modules.id", ondelete="RESTRICT"), nullable=False
+    from_module_id: Mapped[UUID | None] = mapped_column(
+        Uuid, ForeignKey("modules.id", ondelete="RESTRICT"), nullable=True
     )
-    to_module_id: Mapped[int] = mapped_column(
-        Integer, ForeignKey("modules.id", ondelete="RESTRICT"), nullable=False
+    to_module_id: Mapped[UUID] = mapped_column(
+        Uuid, ForeignKey("modules.id", ondelete="RESTRICT"), nullable=False
     )
-    session_id: Mapped[int] = mapped_column(
-        Integer, ForeignKey("sessions.id", ondelete="SET NULL"), nullable=True
+    session_id: Mapped[UUID | None] = mapped_column(
+        Uuid, ForeignKey("sessions.id", ondelete="SET NULL"), nullable=True
     )
     reason_text: Mapped[str | None] = mapped_column(Text, nullable=True)
     evidence_json: Mapped[Any] = mapped_column(JSON, nullable=True)

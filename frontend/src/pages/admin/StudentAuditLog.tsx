@@ -4,12 +4,12 @@ import { useQuery } from '@tanstack/react-query';
 import { api } from '../../services/api';
 
 interface AuditLogEntry {
-  id: number;
-  from_module_id: number | null;
-  to_module_id: number;
+  id: string;
+  from_module_id: string | null;
+  to_module_id: string;
   from_module_title: string | null;
   to_module_title: string | null;
-  session_id: number | null;
+  session_id: string | null;
   reason_text: string;
   evidence_json: Record<string, unknown> | null;
   created_at: string;

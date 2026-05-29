@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { useQuery } from '@tanstack/react-query';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { api } from '../../services/api';
 import { SessionWebSocket } from '../../services/websocket';
 import { useSessionStore } from '../../store/sessionStore';
@@ -16,12 +16,13 @@ import type { ClassResponse, Message } from '../../types';
 import type { LevelUpData } from '../../services/websocket';
 
 interface SessionCreateResponse {
-  id: number;
+  id: string;
 }
 
 export default function ClassRoom() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
+  const queryClient = useQueryClient();
   const sessionStore = useSessionStore();
   const { messages, startNewMessage, appendToCurrentMessage, finalizeCurrentMessage } = useTranscript();
   const { startCapture, stopCapture, isSpeaking } = useAudioCapture();
@@ -32,6 +33,8 @@ export default function ClassRoom() {
   const [sessionCreated, setSessionCreated] = useState(false);
   const [levelUpData, setLevelUpData] = useState<LevelUpData | null>(null);
   const [micActive, setMicActive] = useState(false);
+  // Half-duplex gate — suppress mic while AI is speaking
+  const aiSpeakingRef = useRef(false);
 
   const { data: cls } = useQuery<ClassResponse>({
     queryKey: ['class', id],
@@ -42,39 +45,46 @@ export default function ClassRoom() {
   // Create session then connect WebSocket
   useEffect(() => {
     if (!id || sessionCreated) return;
-    let sessionId: number | null = null;
+    let sessionId: string | null = null;
 
     async function createSession() {
       try {
         const res = await api.post<SessionCreateResponse>('/sessions', {
           session_type: 'class',
-          class_id: Number(id),
+          class_id: id,
         });
         sessionId = res.data.id;
-        sessionStore.setSession(res.data.id, 'class', Number(id));
+        sessionStore.setSession(res.data.id, 'class', id ?? null);
         setSessionCreated(true);
 
         // Connect WebSocket now that we have a sessionId
         const ws = new SessionWebSocket({
           sessionType: 'class',
-          refId: Number(id),
+          refId: id ?? null,
           onAudioOutput: (audio) => {
-            // audio is already raw PCM ArrayBuffer from base64 decode
             const int16 = new Int16Array(audio);
-            // Re-encode as base64 for enqueueBase64Audio — or use enqueueAudio directly
-            // enqueueBase64Audio expects base64; convert back
             const bytes = new Uint8Array(int16.buffer);
             let bin = '';
             for (let i = 0; i < bytes.length; i++) bin += String.fromCharCode(bytes[i]);
             enqueueBase64Audio(btoa(bin));
           },
-          onTextOutput: (text, role) => {
-            const msgRole = role === 'USER' ? 'USER' : 'ASSISTANT';
-            startNewMessage(msgRole);
-            appendToCurrentMessage(text);
+          onAiSpeakingChange: (speaking) => {
+            aiSpeakingRef.current = speaking;
+          },
+          onContentStart: (role) => {
+            startNewMessage(role === 'USER' ? 'USER' : 'ASSISTANT');
+          },
+          onContentEnd: () => {
             finalizeCurrentMessage();
           },
-          onLevelUp: (data) => setLevelUpData(data),
+          onTextOutput: (text) => {
+            appendToCurrentMessage(text);
+          },
+          onLevelUp: (data) => { if (data.to_module_id) setLevelUpData(data); },
+          onClassComplete: (data) => {
+            sessionStore.addXp(data.xp_awarded);
+            setShowSummary(true);
+          },
           onConnectionStatus: (status) => {
             if (status === 'authenticated') {
               sessionStore.setWsConnected(true);
@@ -120,7 +130,12 @@ export default function ClassRoom() {
       setMicActive(false);
     } else {
       void startCapture(
-        (pcm) => wsRef.current?.sendAudio(pcm),
+        (pcm) => {
+          // Half-duplex: drop frames while AI is speaking
+          if (!aiSpeakingRef.current) {
+            wsRef.current?.sendAudio(pcm);
+          }
+        },
         () => { /* VAD silence — no explicit stop needed */ },
       );
       setMicActive(true);
@@ -133,6 +148,8 @@ export default function ClassRoom() {
 
   function handleSummaryClose() {
     setShowSummary(false);
+    void queryClient.invalidateQueries({ queryKey: ['classes', String(cls?.module_id ?? '')] });
+    void queryClient.invalidateQueries({ queryKey: ['modules'] });
     navigate(`/modules/${cls?.module_id ?? ''}`, { replace: true });
   }
 

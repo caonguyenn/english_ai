@@ -1,9 +1,11 @@
 """Module and Class Pydantic v2 schemas."""
+from uuid import UUID
+
 from pydantic import BaseModel
 
 
 class ModuleResponse(BaseModel):
-    id: int
+    id: UUID
     band_min: float
     band_max: float
     title: str
@@ -21,8 +23,8 @@ class ModuleWithProgressResponse(ModuleResponse):
 
 
 class ClassResponse(BaseModel):
-    id: int
-    module_id: int
+    id: UUID
+    module_id: UUID
     title: str
     skill_type: str
     description: str | None
@@ -34,7 +36,7 @@ class ClassResponse(BaseModel):
 
 
 class PlaygroundTopicResponse(BaseModel):
-    id: int
+    id: UUID
     slug: str
     title: str
     description: str | None

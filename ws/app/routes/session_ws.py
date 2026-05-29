@@ -41,11 +41,11 @@ async def _forward_responses(websocket: WebSocket, stream: BedrockStreamManager)
 
 
 async def _keepalive(stream: BedrockStreamManager) -> None:
-    """Send 100 ms silence every second to keep the Bedrock stream alive."""
+    """Send silence only while the assistant is not speaking to avoid barge-in."""
     silence = b"\x00\x00" * 3200  # 100 ms @ 16 kHz 16-bit mono
     while stream.is_active:
         await asyncio.sleep(1)
-        if stream.is_active:
+        if stream.is_active and not stream.assistant_speaking:
             stream.add_audio_chunk(silence)
 
 
@@ -67,7 +67,7 @@ async def _watch_stream(websocket: WebSocket, stream: BedrockStreamManager) -> N
 async def websocket_session(
     websocket: WebSocket,
     type: str = Query(..., description="Session type: class | playground | placement"),
-    ref_id: int | None = Query(None, description="class_id or topic_id; omit for placement"),
+    ref_id: str | None = Query(None, description="class_id or topic_id (UUID); omit for placement"),
 ) -> None:
     # -- Validate query params BEFORE accepting (cannot send 1008 before accept on most clients,
     #    but we still guard here to fail fast after accept)
@@ -88,7 +88,7 @@ async def websocket_session(
         return  # already closed with 1008
 
     student_sub: str = payload.get("sub", "")
-    session_id: int = payload["_session_id"]
+    session_id: str = payload["_session_id"]
     # Preserve raw token so prompt_builder and tool_handler can call REST API
     # on behalf of the authenticated student.
     token: str = payload.get("_token", "")
@@ -100,19 +100,35 @@ async def websocket_session(
 
     async def _send_level_up_event(result: dict) -> None:
         """Forward approved level-up to the frontend as a WS JSON event."""
+        new_module_id = result.get("new_module_id")
         try:
             await websocket.send_json({
                 "event": {
                     "levelUp": {
                         "from_module": result.get("from_module", ""),
                         "to_module": result.get("to_module", ""),
-                        "to_module_id": result.get("new_module_id", 0),
+                        "to_module_id": str(new_module_id) if new_module_id else None,
                         "band": result.get("new_band", 0),
                     }
                 }
             })
         except Exception as exc:
             logger.warning("Failed to send level-up event to client: %s", exc)
+
+    async def _send_class_complete_event(result: dict) -> None:
+        """Forward class completion + XP award to the frontend as a WS JSON event."""
+        try:
+            await websocket.send_json({
+                "event": {
+                    "classComplete": {
+                        "xp_awarded": result.get("xp_awarded", 0),
+                        "class_title": result.get("class_title", ""),
+                        "reason": result.get("reason", ""),
+                    }
+                }
+            })
+        except Exception as exc:
+            logger.warning("Failed to send class-complete event to client: %s", exc)
 
     tool_handler = ToolHandler(
         student_sub=student_sub,
@@ -121,6 +137,7 @@ async def websocket_session(
         ref_id=ref_id,
         token=token,
         on_level_up=_send_level_up_event,
+        on_complete=_send_class_complete_event,
     )
     stream = BedrockStreamManager(tool_handler=tool_handler)
 
@@ -143,14 +160,18 @@ async def websocket_session(
     try:
         while True:
             message = await websocket.receive()
+            mtype = message.get("type", "")
+            if mtype == "websocket.disconnect":
+                break
             if message.get("bytes"):
                 stream.add_audio_chunk(message["bytes"])
             elif message.get("text"):
                 if message["text"] == "close":
                     break
-                # Ignore other text control frames for now (Phase 6 may add events)
     except WebSocketDisconnect:
         logger.info("Client disconnected — student=%s session_id=%s", student_sub, session_id)
+    except RuntimeError:
+        pass  # WebSocket already closed (stream ended first)
     finally:
         forward_task.cancel()
         keepalive_task.cancel()

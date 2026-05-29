@@ -1,6 +1,7 @@
 """Session lifecycle routes — create, patch, scores, level-up."""
 import json
 from typing import Any
+from uuid import UUID
 
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -8,6 +9,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.core.dependencies import get_current_student, get_db, require_internal
 from app.db.models.student import Student
 from app.schemas.session import (
+    ClassCompleteRequest,
     LevelUpRequest,
     MAX_TRANSCRIPT_SIZE,
     SessionCreate,
@@ -34,7 +36,7 @@ async def create_session(
 
 @router.get("/{session_id}", response_model=SessionResponse)
 async def get_session(
-    session_id: int,
+    session_id: UUID,
     current: Student = Depends(get_current_student),
     db: AsyncSession = Depends(get_db),
 ) -> SessionResponse:
@@ -48,7 +50,7 @@ async def get_session(
 
 @router.patch("/{session_id}", response_model=SessionResponse)
 async def patch_session(
-    session_id: int,
+    session_id: UUID,
     body: SessionPatch,
     current: Student = Depends(get_current_student),
     db: AsyncSession = Depends(get_db),
@@ -78,7 +80,7 @@ async def patch_session(
     if updated.transcript_json:
         try:
             from app.tasks.summarize import summarize_session
-            summarize_session.delay(updated.id)
+            summarize_session.delay(str(updated.id))
         except Exception:
             # Celery worker not running (common in dev) — skip silently
             pass
@@ -88,7 +90,7 @@ async def patch_session(
 
 @router.post("/{session_id}/scores", status_code=201)
 async def add_skill_score(
-    session_id: int,
+    session_id: UUID,
     body: SkillScoreCreate,
     current: Student = Depends(get_current_student),
     db: AsyncSession = Depends(get_db),
@@ -104,7 +106,12 @@ async def add_skill_score(
         raise HTTPException(status_code=403, detail="Access denied")
 
     score = await SessionService.add_skill_score(db, session_id=session_id, data=body)
-    return {"id": score.id, "session_id": score.session_id, "skill": score.skill, "score": score.score}
+    return {
+        "id": str(score.id),
+        "session_id": str(score.session_id),
+        "skill": score.skill,
+        "score": score.score,
+    }
 
 
 @router.post(
@@ -113,7 +120,7 @@ async def add_skill_score(
     dependencies=[Depends(require_internal)],
 )
 async def trigger_level_up(
-    session_id: int,
+    session_id: UUID,
     body: LevelUpRequest,
     db: AsyncSession = Depends(get_db),
 ) -> dict[str, Any]:
@@ -128,7 +135,22 @@ async def trigger_level_up(
     if not student:
         raise HTTPException(status_code=404, detail="Student not found")
 
-    # Capture from_module_id before validation mutates student
+    # Look up the session to determine its type
+    session = await SessionService.get(db, session_id)
+    is_placement = session is not None and session.session_type.value == "placement"
+
+    if is_placement:
+        # Placement bypasses session-count and score validation
+        result = await LevelUpService.handle_placement(
+            db,
+            student=student,
+            session_id=session_id,
+            reason=body.reason,
+            evidence=body.evidence,
+        )
+        return result
+
+    # --- Regular (class/playground) level-up ---
     from_module_id = student.current_module_id
 
     result = await LevelUpService.validate_and_execute(
@@ -148,4 +170,36 @@ async def trigger_level_up(
         result["to_module"] = to_module.title if to_module else ""
         result["new_band"] = to_module.band_min if to_module else 0
 
+    return result
+
+
+@router.post(
+    "/{session_id}/complete",
+    include_in_schema=False,  # internal endpoint, not in public OpenAPI
+    dependencies=[Depends(require_internal)],
+)
+async def complete_class(
+    session_id: UUID,
+    body: ClassCompleteRequest,
+    db: AsyncSession = Depends(get_db),
+) -> dict[str, Any]:
+    """Internal endpoint called by WS server when NovaSonic completes a class.
+
+    Awards the class's defined XP (server-decided, never model-decided) and marks
+    the session ended. Idempotent. Student identified by student_sub, not auth token.
+    """
+    student = await StudentService.get_by_cognito_sub(db, body.student_sub)
+    if not student:
+        raise HTTPException(status_code=404, detail="Student not found")
+
+    session = await SessionService.get(db, session_id)
+    if not session:
+        raise HTTPException(status_code=404, detail="Session not found")
+    if session.student_id != student.id:
+        raise HTTPException(status_code=403, detail="Session does not belong to student")
+    if session.session_type.value != "class":
+        raise HTTPException(status_code=400, detail="Not a class session")
+
+    result = await SessionService.complete_class_session(db, session)
+    result["reason"] = body.reason
     return result
