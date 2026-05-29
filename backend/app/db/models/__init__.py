@@ -4,6 +4,7 @@ from app.db.models.module import Module, Class, Enrollment
 from app.db.models.session import Session, SkillScore
 from app.db.models.level_audit import LevelAuditLog
 from app.db.models.playground_topic import PlaygroundTopic
+from app.db.models.learning import AnalysisResult, StudentLearningProfile, StudyPlan
 
 __all__ = [
     "Student",
@@ -14,4 +15,7 @@ __all__ = [
     "SkillScore",
     "LevelAuditLog",
     "PlaygroundTopic",
+    "AnalysisResult",
+    "StudentLearningProfile",
+    "StudyPlan",
 ]

@@ -64,7 +64,7 @@ Phase 3 (Gamification) — PARALLEL, no AI dependency, can start anytime after P
 | # | Phase | Status | Depends on | Effort | File |
 |---|-------|--------|-----------|--------|------|
 | 0 | Foundations | complete | — | ~12h | [phase-00-foundations.md](phase-00-foundations.md) |
-| 1 | Analysis Engine (Nova Lite) ★ | pending | 0 | ~30h | [phase-01-analysis-engine.md](phase-01-analysis-engine.md) |
+| 1 | Analysis Engine (Nova Lite) ★ | complete | 0 | ~30h | [phase-01-analysis-engine.md](phase-01-analysis-engine.md) |
 | 2 | Feedback UI + AI Memory | pending | 1 | ~24h | [phase-02-feedback-and-memory.md](phase-02-feedback-and-memory.md) |
 | 3 | Gamification (parallel) | pending | 0 | ~20h | [phase-03-gamification.md](phase-03-gamification.md) |
 | 4 | Adaptive Grammar | pending | 1 | ~24h | [phase-04-adaptive-grammar.md](phase-04-adaptive-grammar.md) |

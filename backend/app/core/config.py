@@ -20,6 +20,7 @@ class Settings(BaseSettings):
 
     # Bedrock
     BEDROCK_MODEL_ID: str = "amazon.nova-sonic-v1:0"
+    NOVA_ANALYSIS_MODEL_ID: str = "amazon.nova-lite-v1:0"
 
     # S3
     S3_BUCKET_NAME: str = ""
