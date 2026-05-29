@@ -9,11 +9,17 @@ import LoginPage from './pages/auth/LoginPage';
 // Student pages
 import Dashboard from './pages/Dashboard';
 import PlacementSession from './pages/PlacementSession';
+import ModulesList from './pages/modules/ModulesList';
 import ModulePage from './pages/modules/ModulePage';
 import ClassRoom from './pages/modules/ClassRoom';
 import PlaygroundHome from './pages/playground/PlaygroundHome';
 import PlaygroundSession from './pages/playground/PlaygroundSession';
 import ProfilePage from './pages/profile/ProfilePage';
+import GrammarPractice from './pages/practice/GrammarPractice';
+// Mock Test pages (Phase 7)
+import MockTestHome from './pages/mock-test/MockTestHome';
+import MockTestSession from './pages/mock-test/MockTestSession';
+import MockTestResult from './pages/mock-test/MockTestResult';
 // Admin pages (Phase 5B)
 import AdminLayout from './pages/admin/AdminLayout';
 import StudentList from './pages/admin/StudentList';
@@ -65,11 +71,18 @@ function App() {
           {/* Protected — Student */}
           <Route path="/placement" element={<ProtectedRoute><PlacementSession /></ProtectedRoute>} />
           <Route path="/dashboard" element={<ProtectedRoute><Dashboard /></ProtectedRoute>} />
+          <Route path="/modules" element={<ProtectedRoute><ModulesList /></ProtectedRoute>} />
           <Route path="/modules/:id" element={<ProtectedRoute><ModulePage /></ProtectedRoute>} />
           <Route path="/class/:id" element={<ProtectedRoute><ClassRoom /></ProtectedRoute>} />
           <Route path="/playground" element={<ProtectedRoute><PlaygroundHome /></ProtectedRoute>} />
           <Route path="/playground/:topic" element={<ProtectedRoute><PlaygroundSession /></ProtectedRoute>} />
           <Route path="/profile" element={<ProtectedRoute><ProfilePage /></ProtectedRoute>} />
+          <Route path="/practice/grammar" element={<ProtectedRoute><GrammarPractice /></ProtectedRoute>} />
+
+          {/* Mock Test (Phase 7) */}
+          <Route path="/mock-test" element={<ProtectedRoute><MockTestHome /></ProtectedRoute>} />
+          <Route path="/mock-test/session" element={<ProtectedRoute><MockTestSession /></ProtectedRoute>} />
+          <Route path="/mock-test/result/:sessionId" element={<ProtectedRoute><MockTestResult /></ProtectedRoute>} />
 
           {/* Admin (Phase 5B) */}
           <Route path="/admin" element={<AdminRoute><AdminLayout /></AdminRoute>}>

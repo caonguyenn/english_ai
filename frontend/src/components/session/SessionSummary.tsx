@@ -1,5 +1,12 @@
 import { useEffect, useRef, useState } from 'react';
 import { X, Trophy } from 'lucide-react';
+import { useQuery } from '@tanstack/react-query';
+import { getSessionAnalysis, getStudentProfile } from '../../services/api';
+import { BandCard } from './feedback/BandCard';
+import { GrammarMistakes } from './feedback/GrammarMistakes';
+import { PronunciationComingSoon } from './feedback/PronunciationComingSoon';
+import { VocabPanel } from './feedback/VocabPanel';
+import type { AnalysisResult, LearningProfile } from '../../types';
 
 interface SkillScore {
   skill: string;
@@ -12,6 +19,77 @@ interface SessionSummaryProps {
   skillScores?: SkillScore[];
   ctaLabel?: string;
   onClose: () => void;
+  /** Phase 2: pass to enable post-session analysis panels */
+  sessionId?: string;
+  studentId?: string;
+}
+
+// ── FeedbackPanels ────────────────────────────────────────────────────────────
+
+function SkeletonBlock({ height = 80 }: { height?: number }) {
+  return (
+    <div style={{
+      height,
+      borderRadius: 'var(--radius-md)',
+      background: 'rgba(255,255,255,0.04)',
+      animation: 'pulse 1.5s ease-in-out infinite',
+    }} />
+  );
+}
+
+interface FeedbackPanelsProps {
+  sessionId: string;
+  studentId: string;
+}
+
+function FeedbackPanels({ sessionId, studentId }: FeedbackPanelsProps) {
+  const { data: analysis, isLoading: analysisLoading } = useQuery<AnalysisResult>({
+    queryKey: ['session-analysis', sessionId],
+    queryFn: () => getSessionAnalysis(sessionId) as Promise<AnalysisResult>,
+    staleTime: 30_000,
+  });
+
+  const { data: profile } = useQuery<LearningProfile>({
+    queryKey: ['student-profile', studentId],
+    queryFn: () => getStudentProfile(studentId) as Promise<LearningProfile>,
+    staleTime: 60_000,
+  });
+
+  const isPending =
+    analysisLoading ||
+    analysis?.status === 'pending' ||
+    profile?.status === 'pending';
+
+  if (isPending) {
+    return (
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 12, marginTop: 4 }}>
+        <SkeletonBlock height={60} />
+        <SkeletonBlock height={80} />
+      </div>
+    );
+  }
+
+  const band = analysis?.band_estimate ?? profile
+    ? {
+        fluency: profile?.fluency_band ?? analysis?.band_estimate?.fluency,
+        grammar: profile?.grammar_band ?? analysis?.band_estimate?.grammar,
+        vocabulary: profile?.vocabulary_band ?? analysis?.band_estimate?.vocabulary,
+        overall: profile?.overall_band ?? analysis?.band_estimate?.overall,
+      }
+    : null;
+
+  return (
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 20, marginTop: 4 }}>
+      {band && <BandCard band={band} />}
+      {analysis?.grammar_mistakes?.length ? (
+        <GrammarMistakes mistakes={analysis.grammar_mistakes} />
+      ) : null}
+      {analysis?.vocab_usage?.length ? (
+        <VocabPanel vocab={analysis.vocab_usage} />
+      ) : null}
+      <PronunciationComingSoon />
+    </div>
+  );
 }
 
 const SKILL_COLORS: Record<string, string> = {
@@ -52,6 +130,8 @@ export default function SessionSummary({
   skillScores = [],
   ctaLabel = 'Back to Module',
   onClose,
+  sessionId,
+  studentId,
 }: SessionSummaryProps) {
   const overlayRef = useRef<HTMLDivElement>(null);
 
@@ -163,6 +243,13 @@ export default function SessionSummary({
                 </div>
               ))}
             </div>
+          </div>
+        )}
+
+        {/* Phase 2: Feedback panels (analysis + band estimate) */}
+        {sessionId && studentId && (
+          <div style={{ marginBottom: 24 }}>
+            <FeedbackPanels sessionId={sessionId} studentId={studentId} />
           </div>
         )}
 

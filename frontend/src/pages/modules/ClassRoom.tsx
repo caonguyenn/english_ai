@@ -1,284 +1,121 @@
-import { useEffect, useRef, useState } from 'react';
-import { useParams, useNavigate } from 'react-router-dom';
-import { useQuery, useQueryClient } from '@tanstack/react-query';
-import { api } from '../../services/api';
-import { SessionWebSocket } from '../../services/websocket';
-import { useSessionStore } from '../../store/sessionStore';
-import { useTranscript } from '../../hooks/useTranscript';
-import { useAudioCapture } from '../../hooks/useAudioCapture';
-import { useAudioPlayback } from '../../hooks/useAudioPlayback';
-import { StatusIndicator } from '../../components/StatusIndicator';
-import { MicButton } from '../../components/MicButton';
-import SessionBar from '../../components/session/SessionBar';
-import SessionSummary from '../../components/session/SessionSummary';
-import LevelUpOverlay from '../../components/session/LevelUpOverlay';
-import type { ClassResponse, Message } from '../../types';
-import type { LevelUpData } from '../../services/websocket';
+import { useEffect, useRef, useState } from 'react'
+import { useParams, useNavigate } from 'react-router-dom'
+import { useQuery, useQueryClient } from '@tanstack/react-query'
+import gsap from 'gsap'
+import { api, getClassStages, patchSessionStage } from '../../services/api'
+import { useAuthStore } from '../../store/authStore'
+import { StageStepper } from '../../components/session/stages/StageStepper'
+import { VocabIntroStage } from '../../components/session/stages/VocabIntroStage'
+import { GrammarFocusStage } from '../../components/session/stages/GrammarFocusStage'
+import { SpeakingStage } from '../../components/session/stages/SpeakingStage'
+import { FeedbackStage } from '../../components/session/stages/FeedbackStage'
+import type { ClassResponse, LessonStages } from '../../types'
 
-interface SessionCreateResponse {
-  id: string;
-}
+type Stage = 1 | 2 | 3 | 4
 
 export default function ClassRoom() {
-  const { id } = useParams<{ id: string }>();
-  const navigate = useNavigate();
-  const queryClient = useQueryClient();
-  const sessionStore = useSessionStore();
-  const { messages, startNewMessage, appendToCurrentMessage, finalizeCurrentMessage } = useTranscript();
-  const { startCapture, stopCapture, isSpeaking } = useAudioCapture();
-  const { enqueueBase64Audio, clearQueue } = useAudioPlayback();
-  const transcriptRef = useRef<HTMLDivElement>(null);
-  const wsRef = useRef<SessionWebSocket | null>(null);
-  const [showSummary, setShowSummary] = useState(false);
-  const [sessionCreated, setSessionCreated] = useState(false);
-  const [levelUpData, setLevelUpData] = useState<LevelUpData | null>(null);
-  const [micActive, setMicActive] = useState(false);
-  // Half-duplex gate — suppress mic while AI is speaking
-  const aiSpeakingRef = useRef(false);
+  const { id } = useParams<{ id: string }>()
+  const navigate = useNavigate()
+  const queryClient = useQueryClient()
+  const profile = useAuthStore(s => s.profile)
+  const [stage, setStage] = useState<Stage>(1)
+  const [sessionId, setSessionId] = useState<string | null>(null)
+  const containerRef = useRef<HTMLDivElement>(null)
 
   const { data: cls } = useQuery<ClassResponse>({
     queryKey: ['class', id],
     queryFn: async () => (await api.get<ClassResponse>(`/classes/${id}`)).data,
     enabled: !!id,
-  });
+  })
 
-  // Create session then connect WebSocket
+  const { data: stages } = useQuery<LessonStages>({
+    queryKey: ['class-stages', id],
+    queryFn: () => getClassStages(id!) as Promise<LessonStages>,
+    enabled: !!id,
+  })
+
+  // If no stage_content, skip directly to Stage 3 once stages data loaded
+  const hasVocab = (stages?.vocab?.length ?? 0) > 0
+  const hasGrammar = !!stages?.grammar_focus
+  const hasStageContent = hasVocab || hasGrammar
+
   useEffect(() => {
-    if (!id || sessionCreated) return;
-    let sessionId: string | null = null;
-
-    async function createSession() {
-      try {
-        const res = await api.post<SessionCreateResponse>('/sessions', {
-          session_type: 'class',
-          class_id: id,
-        });
-        sessionId = res.data.id;
-        sessionStore.setSession(res.data.id, 'class', id ?? null);
-        setSessionCreated(true);
-
-        // Connect WebSocket now that we have a sessionId
-        const ws = new SessionWebSocket({
-          sessionType: 'class',
-          refId: id ?? null,
-          onAudioOutput: (audio) => {
-            const int16 = new Int16Array(audio);
-            const bytes = new Uint8Array(int16.buffer);
-            let bin = '';
-            for (let i = 0; i < bytes.length; i++) bin += String.fromCharCode(bytes[i]);
-            enqueueBase64Audio(btoa(bin));
-          },
-          onAiSpeakingChange: (speaking) => {
-            aiSpeakingRef.current = speaking;
-          },
-          onContentStart: (role) => {
-            startNewMessage(role === 'USER' ? 'USER' : 'ASSISTANT');
-          },
-          onContentEnd: () => {
-            finalizeCurrentMessage();
-          },
-          onTextOutput: (text) => {
-            appendToCurrentMessage(text);
-          },
-          onLevelUp: (data) => { if (data.to_module_id) setLevelUpData(data); },
-          onClassComplete: (data) => {
-            sessionStore.addXp(data.xp_awarded);
-            setShowSummary(true);
-          },
-          onConnectionStatus: (status) => {
-            if (status === 'authenticated') {
-              sessionStore.setWsConnected(true);
-            }
-          },
-          onError: (err) => console.error('[ClassRoom WS]', err),
-        });
-        ws.connect(res.data.id);
-        wsRef.current = ws;
-      } catch {
-        // Session creation failed — UI still renders with disconnected state
-      }
+    if (stages !== undefined && !hasStageContent) {
+      setStage(3)
     }
+  }, [stages, hasStageContent])
 
-    void createSession();
-
-    return () => {
-      wsRef.current?.close();
-      wsRef.current = null;
-      stopCapture();
-      clearQueue();
-      if (sessionId !== null) {
-        void api.patch(`/sessions/${sessionId}`, {
-          ended_at: new Date().toISOString(),
-        }).catch(() => { /* best-effort */ });
-        sessionStore.endSession();
-      }
-    };
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [id]);
-
-  // Auto-scroll transcript to bottom
-  useEffect(() => {
-    if (transcriptRef.current) {
-      transcriptRef.current.scrollTop = transcriptRef.current.scrollHeight;
-    }
-  }, [messages]);
-
-  function handleMicToggle() {
-    if (!sessionStore.wsConnected) return;
-    if (micActive) {
-      stopCapture();
-      setMicActive(false);
-    } else {
-      void startCapture(
-        (pcm) => {
-          // Half-duplex: drop frames while AI is speaking
-          if (!aiSpeakingRef.current) {
-            wsRef.current?.sendAudio(pcm);
-          }
+  function advanceStage(next: Stage, sid?: string) {
+    const ctx = gsap.context(() => {
+      gsap.to(containerRef.current, {
+        opacity: 0,
+        x: -20,
+        duration: 0.2,
+        onComplete: () => {
+          setStage(next)
+          if (sid) setSessionId(sid)
+          gsap.fromTo(
+            containerRef.current,
+            { opacity: 0, x: 20 },
+            { opacity: 1, x: 0, duration: 0.3 },
+          )
         },
-        () => { /* VAD silence — no explicit stop needed */ },
-      );
-      setMicActive(true);
+      })
+    })
+    // Patch stage on server when we have a sessionId and entering stage 3+
+    const activeSid = sid ?? sessionId
+    if (activeSid && next >= 3) {
+      patchSessionStage(activeSid, next).catch(() => { /* best-effort */ })
     }
+    return ctx
   }
 
-  function handleExit() {
-    setShowSummary(true);
+  function handleClose() {
+    void queryClient.invalidateQueries({ queryKey: ['modules'] })
+    void queryClient.invalidateQueries({ queryKey: ['classes', String(cls?.module_id ?? '')] })
+    navigate(`/modules/${cls?.module_id ?? ''}`, { replace: true })
   }
 
-  function handleSummaryClose() {
-    setShowSummary(false);
-    void queryClient.invalidateQueries({ queryKey: ['classes', String(cls?.module_id ?? '')] });
-    void queryClient.invalidateQueries({ queryKey: ['modules'] });
-    navigate(`/modules/${cls?.module_id ?? ''}`, { replace: true });
-  }
-
-  const wsReady = sessionStore.wsConnected;
+  if (!id || !profile) return null
 
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', height: '100vh', background: 'var(--bg-base)' }}>
-      <SessionBar
-        title={cls?.title ?? 'Loading…'}
-        xpEarned={sessionStore.xpEarned}
-        onExit={handleExit}
-      />
+    <div style={{ maxWidth: 700, margin: '0 auto', padding: 24 }}>
+      {hasStageContent && <StageStepper stage={stage} />}
 
-      <div
-        ref={transcriptRef}
-        aria-live="polite"
-        style={{
-          flex: 1,
-          overflowY: 'auto',
-          padding: '24px 40px',
-          background: 'var(--bg-base)',
-          scrollBehavior: 'smooth',
-        }}
-      >
-        {messages.length === 0 && (
-          <div style={{
-            display: 'flex',
-            flexDirection: 'column',
-            alignItems: 'center',
-            justifyContent: 'center',
-            height: '100%',
-            gap: 12,
-            color: 'var(--text-muted)',
-          }}>
-            <div style={{ fontSize: 48 }}>🎧</div>
-            <p style={{ fontSize: '1.125rem', color: 'var(--text-secondary)' }}>
-              {wsReady ? 'Session active — start speaking' : 'Session starting…'}
-            </p>
-            <p style={{ fontSize: 14, color: 'var(--text-muted)' }}>
-              {cls?.description}
-            </p>
-          </div>
+      <div ref={containerRef}>
+        {stage === 1 && hasVocab && stages?.vocab && (
+          <VocabIntroStage
+            vocab={stages.vocab}
+            onContinue={() => advanceStage(hasGrammar ? 2 : 3)}
+          />
         )}
-        {messages.map((msg) => (
-          <TranscriptBubble key={msg.id} message={msg} />
-        ))}
-      </div>
 
-      <div style={{
-        flexShrink: 0,
-        background: 'var(--bg-surface)',
-        borderTop: '1px solid var(--border-subtle)',
-        padding: '20px 40px',
-        display: 'flex',
-        alignItems: 'center',
-        justifyContent: 'center',
-        gap: 32,
-      }}>
-        <StatusIndicator
-          status={wsReady ? 'connected' : 'connecting'}
-          phase={isSpeaking ? 'listening' : 'idle'}
-        />
-        <MicButton
-          phase={micActive ? 'listening' : 'idle'}
-          isConnecting={!wsReady}
-          onClick={handleMicToggle}
-        />
-        <div style={{ width: 120, color: 'var(--text-muted)', fontSize: 12, fontFamily: 'var(--font-body)' }}>
-          {!wsReady && 'Connecting…'}
-          {wsReady && micActive && 'Listening…'}
-        </div>
-      </div>
+        {stage === 2 && hasGrammar && stages?.grammar_focus && (
+          <GrammarFocusStage
+            studentId={profile.id}
+            grammarCategory={stages.grammar_focus.category}
+            onContinue={() => advanceStage(3)}
+          />
+        )}
 
-      {showSummary && (
-        <SessionSummary
-          durationSeconds={0}
-          xpEarned={sessionStore.xpEarned}
-          ctaLabel="Back to Module"
-          onClose={handleSummaryClose}
-        />
-      )}
+        {stage === 3 && (
+          <SpeakingStage
+            classId={id}
+            studentId={profile.id}
+            className={cls?.title}
+            classDescription={cls?.description}
+            onComplete={(sid) => advanceStage(4, sid)}
+          />
+        )}
 
-      {levelUpData && (
-        <LevelUpOverlay
-          fromModule={levelUpData.from_module}
-          toModuleId={levelUpData.to_module_id}
-          toModuleTitle={levelUpData.to_module}
-          sessionsCompleted={0}
-          avgScore={0}
-          onDismiss={() => setLevelUpData(null)}
-        />
-      )}
-    </div>
-  );
-}
-
-function TranscriptBubble({ message }: { message: Message }) {
-  const isAI = message.role === 'ASSISTANT';
-  return (
-    <div
-      className="msg-in"
-      style={{
-        display: 'flex',
-        justifyContent: isAI ? 'flex-start' : 'flex-end',
-        marginBottom: 16,
-      }}
-    >
-      <div style={{
-        maxWidth: '65%',
-        background: isAI ? 'var(--bg-surface)' : 'var(--accent-gold-muted)',
-        border: `1px solid ${isAI ? 'var(--border-subtle)' : 'var(--border-gold)'}`,
-        borderRadius: isAI ? '4px 16px 16px 16px' : '16px 4px 16px 16px',
-        padding: '12px 16px',
-        fontFamily: isAI ? 'var(--font-body)' : 'var(--font-mono)',
-        fontSize: 15,
-        lineHeight: 1.6,
-        color: 'var(--text-primary)',
-      }}>
-        {message.content}
-        {message.isStreaming && <span className="blink" style={{ marginLeft: 2 }}>▍</span>}
-        <div style={{
-          fontSize: 11,
-          color: 'var(--text-muted)',
-          marginTop: 4,
-          textAlign: isAI ? 'left' : 'right',
-        }}>
-          {new Date(message.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
-        </div>
+        {stage === 4 && sessionId && (
+          <FeedbackStage
+            sessionId={sessionId}
+            studentId={profile.id}
+            onClose={handleClose}
+          />
+        )}
       </div>
     </div>
-  );
+  )
 }

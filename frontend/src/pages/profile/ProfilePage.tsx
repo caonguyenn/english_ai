@@ -1,9 +1,13 @@
 import { useEffect, useRef, useState } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { gsap } from 'gsap';
-import { api } from '../../services/api';
+import { api, getStreak, getAchievements, getVocabulary } from '../../services/api';
 import { useAuthStore } from '../../store/authStore';
 import AppShell from '../../components/layout/AppShell';
+import { StreakFlame } from '../../components/gamification/StreakFlame';
+import { AchievementsGrid } from '../../components/gamification/AchievementsGrid';
+import { VocabularyGrowthWidget } from '../../components/vocab/VocabularyGrowthWidget';
+import type { Streak, Achievement, VocabularyWord } from '../../types';
 
 interface ProgressResponse {
   xp_total: number;
@@ -62,6 +66,27 @@ export default function ProfilePage() {
     queryFn: async () => (await api.get<AuditEntry[]>(`/students/${profile!.id}/audit-log`)).data,
     enabled: !!profile,
   });
+
+  const { data: streak } = useQuery<Streak>({
+    queryKey: ['streak', profile?.id],
+    queryFn: () => getStreak(profile!.id) as Promise<Streak>,
+    enabled: !!profile?.id,
+  });
+
+  const { data: achievements } = useQuery<Achievement[]>({
+    queryKey: ['achievements', profile?.id],
+    queryFn: () => getAchievements(profile!.id) as Promise<Achievement[]>,
+    enabled: !!profile?.id,
+  });
+
+  const { data: vocab } = useQuery<VocabularyWord[]>({
+    queryKey: ['vocabulary', profile?.id],
+    queryFn: () => getVocabulary(profile!.id) as Promise<VocabularyWord[]>,
+    enabled: !!profile?.id,
+  });
+
+  const totalWords = vocab?.length ?? 0;
+  const masteredWords = vocab?.filter((v) => v.mastery_score >= 80).length ?? 0;
 
   useEffect(() => {
     const ctx = gsap.context(() => {
@@ -279,6 +304,41 @@ export default function ProfilePage() {
                 );
               })}
             </div>
+          </div>
+
+          {/* Streak */}
+          {streak && (
+            <div style={{
+              background: 'var(--bg-surface)',
+              border: '1px solid var(--border-subtle)',
+              borderRadius: 'var(--radius-lg)',
+              padding: '24px',
+            }}>
+              <h3 style={{ fontSize: '1.25rem', fontWeight: 600, color: 'var(--text-primary)', marginBottom: 16 }}>
+                Streak
+              </h3>
+              <StreakFlame currentLen={streak.current_len} longestLen={streak.longest_len} />
+            </div>
+          )}
+
+          {/* Achievements */}
+          {achievements && achievements.length > 0 && (
+            <div style={{
+              background: 'var(--bg-surface)',
+              border: '1px solid var(--border-subtle)',
+              borderRadius: 'var(--radius-lg)',
+              padding: '24px',
+            }}>
+              <h3 style={{ fontSize: '1.25rem', fontWeight: 600, color: 'var(--text-primary)', marginBottom: 16 }}>
+                Achievements
+              </h3>
+              <AchievementsGrid achievements={achievements} />
+            </div>
+          )}
+
+          {/* Vocabulary Growth (Phase 5) */}
+          <div>
+            <VocabularyGrowthWidget totalWords={totalWords} masteredWords={masteredWords} />
           </div>
         </div>
       </div>

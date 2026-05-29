@@ -1,7 +1,7 @@
 ---
 title: "EnglishAI v2 — Learning Intelligence Roadmap"
 description: "Evolve EnglishAI into adaptive IELTS-speaking platform: post-session analysis engine (Nova Lite), AI memory, adaptive grammar/vocab, mock tests, gamification, monetization"
-status: in-progress
+status: mostly-complete
 priority: P1
 effort: 200h+
 branch: master
@@ -65,12 +65,12 @@ Phase 3 (Gamification) — PARALLEL, no AI dependency, can start anytime after P
 |---|-------|--------|-----------|--------|------|
 | 0 | Foundations | complete | — | ~12h | [phase-00-foundations.md](phase-00-foundations.md) |
 | 1 | Analysis Engine (Nova Lite) ★ | complete | 0 | ~30h | [phase-01-analysis-engine.md](phase-01-analysis-engine.md) |
-| 2 | Feedback UI + AI Memory | pending | 1 | ~24h | [phase-02-feedback-and-memory.md](phase-02-feedback-and-memory.md) |
-| 3 | Gamification (parallel) | pending | 0 | ~20h | [phase-03-gamification.md](phase-03-gamification.md) |
-| 4 | Adaptive Grammar | pending | 1 | ~24h | [phase-04-adaptive-grammar.md](phase-04-adaptive-grammar.md) |
-| 5 | Adaptive Vocab + Word Unlock | pending | 1 | ~24h | [phase-05-adaptive-vocab.md](phase-05-adaptive-vocab.md) |
-| 6 | 4-Stage Lessons | pending | 2,4,5 | ~20h | [phase-06-four-stage-lessons.md](phase-06-four-stage-lessons.md) |
-| 7 | IELTS Mock Test | pending | 1 | ~24h | [phase-07-mock-test.md](phase-07-mock-test.md) |
+| 2 | Feedback UI + AI Memory | complete | 1 | ~24h | [phase-02-feedback-and-memory.md](phase-02-feedback-and-memory.md) |
+| 3 | Gamification (parallel) | complete | 0 | ~20h | [phase-03-gamification.md](phase-03-gamification.md) |
+| 4 | Adaptive Grammar | complete | 1 | ~24h | [phase-04-adaptive-grammar.md](phase-04-adaptive-grammar.md) |
+| 5 | Adaptive Vocab + Word Unlock | complete | 1 | ~24h | [phase-05-adaptive-vocab.md](phase-05-adaptive-vocab.md) |
+| 6 | 4-Stage Lessons | complete | 2,4,5 | ~20h | [phase-06-four-stage-lessons.md](phase-06-four-stage-lessons.md) |
+| 7 | IELTS Mock Test | complete | 1 | ~24h | [phase-07-mock-test.md](phase-07-mock-test.md) |
 | 8 | Weekly Reports | pending | 1,3 | ~16h | [phase-08-weekly-reports.md](phase-08-weekly-reports.md) |
 | 9 | Monetization | pending | 2,7,8 | ~24h | [phase-09-monetization.md](phase-09-monetization.md) |
 

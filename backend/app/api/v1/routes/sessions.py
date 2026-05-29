@@ -7,6 +7,7 @@ from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.dependencies import get_current_student, get_db, require_internal
+from app.db.models.session import Session
 from app.db.models.student import Student
 from app.schemas.session import (
     ClassCompleteRequest,
@@ -171,6 +172,33 @@ async def trigger_level_up(
         result["new_band"] = to_module.band_min if to_module else 0
 
     return result
+
+
+@router.patch("/{session_id}/stage")
+async def patch_session_stage(
+    session_id: UUID,
+    body: dict[str, Any],
+    current: Student = Depends(get_current_student),
+    db: AsyncSession = Depends(get_db),
+) -> dict[str, Any]:
+    """Update the current lesson stage for a session (1-4). Ownership-checked."""
+    from app.services.lesson_stage_service import set_stage
+
+    raw_stage = body.get("stage", 1)
+    try:
+        stage = int(raw_stage)
+    except (TypeError, ValueError):
+        raise HTTPException(status_code=422, detail="stage must be an integer 1-4")
+
+    session = await db.get(Session, session_id)
+    if not session:
+        raise HTTPException(status_code=404, detail="Session not found")
+    if session.student_id != current.id:
+        raise HTTPException(status_code=403, detail="Access denied")
+
+    await set_stage(db, session, stage)
+    await db.commit()
+    return {"stage": session.current_stage}
 
 
 @router.post(

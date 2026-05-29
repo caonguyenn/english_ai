@@ -4,6 +4,7 @@ import json
 # ---------------------------------------------------------------------------
 # Tool definitions registered once per session in promptStart
 # ---------------------------------------------------------------------------
+# NovaSonic requires inputSchema.json to be a JSON *string*, not a nested object.
 TOOLS = [
     {
         "toolSpec": {
@@ -13,12 +14,12 @@ TOOLS = [
                 "Call at session end for each practiced skill."
             ),
             "inputSchema": {
-                "json": {
+                "json": json.dumps({
                     "type": "object",
                     "properties": {
                         "skill": {
                             "type": "string",
-                            "enum": ["speaking", "listening", "grammar", "pronunciation"],
+                            "enum": ["speaking", "listening", "grammar", "pronunciation", "vocabulary"],
                         },
                         "score": {"type": "integer", "minimum": 0, "maximum": 100},
                         "notes": {
@@ -27,7 +28,30 @@ TOOLS = [
                         },
                     },
                     "required": ["skill", "score"],
-                }
+                })
+            },
+        }
+    },
+    {
+        "toolSpec": {
+            "name": "complete_class",
+            "description": (
+                "Call ONCE at the end of a structured class session, when the student has "
+                "adequately practiced the lesson's skill and met the learning objective. "
+                "The server decides the exact XP award; you only signal completion and a brief reason. "
+                "Do NOT call this in placement or playground sessions."
+            ),
+            "inputSchema": {
+                "json": json.dumps({
+                    "type": "object",
+                    "properties": {
+                        "reason": {
+                            "type": "string",
+                            "description": "One-sentence summary of what the student accomplished",
+                        },
+                    },
+                    "required": ["reason"],
+                })
             },
         }
     },
@@ -35,10 +59,11 @@ TOOLS = [
         "toolSpec": {
             "name": "trigger_level_up",
             "description": (
-                "Call ONLY when confident the student has mastered the current module."
+                "Call ONLY when confident the student has mastered the current module. "
+                "For placement sessions, include placement_band (2.0–9.0) in evidence."
             ),
             "inputSchema": {
-                "json": {
+                "json": json.dumps({
                     "type": "object",
                     "properties": {
                         "reason": {"type": "string"},
@@ -51,11 +76,17 @@ TOOLS = [
                                     "type": "array",
                                     "items": {"type": "string"},
                                 },
+                                "placement_band": {
+                                    "type": "number",
+                                    "description": "IELTS band 2.0-9.0 assessed during placement",
+                                    "minimum": 2.0,
+                                    "maximum": 9.0,
+                                },
                             },
                         },
                     },
                     "required": ["reason", "evidence"],
-                }
+                })
             },
         }
     },

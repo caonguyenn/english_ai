@@ -105,6 +105,64 @@ export interface LevelUpEvent {
   band: number;
 }
 
+// ── Feedback + Memory (Phase 2) ──────────────────────────────────────────────
+export interface GrammarMistake {
+  original: string;
+  corrected: string;
+  reason: string;
+  category?: string;
+  severity?: string;
+}
+
+export interface VocabItem {
+  word: string;
+  frequency?: number;
+}
+
+export interface FluencyMetrics {
+  wpm?: number;
+  avg_response_length_words?: number;
+  filler_count?: number;
+}
+
+export interface BandEstimate {
+  fluency?: number;
+  grammar?: number;
+  vocabulary?: number;
+  overall?: number;
+}
+
+export interface AnalysisResult {
+  session_id: string;
+  status: 'ready' | 'pending';
+  grammar_mistakes: GrammarMistake[];
+  vocab_usage: VocabItem[];
+  fluency_metrics: FluencyMetrics;
+  band_estimate: BandEstimate;
+  created_at?: string;
+}
+
+export interface LearningProfile {
+  student_id: string;
+  status: 'ready' | 'pending';
+  overall_band?: number;
+  fluency_band?: number;
+  grammar_band?: number;
+  vocabulary_band?: number;
+  strengths: string[];
+  weaknesses: string[];
+  sessions_analyzed: number;
+  updated_at?: string;
+}
+
+export interface Memory {
+  id: string;
+  memory_type: string;
+  memory_value: string;
+  confidence_score: number;
+  updated_at: string;
+}
+
 export type ServerMessage =
   | { event: { connectionStatus: { status: string; message: string } } }
   | { event: { textOutput: { content: string; role: MessageRole; additionalModelFields?: string } } }
@@ -116,3 +174,105 @@ export type ServerMessage =
   | { event: { toolUse: { toolName: string; toolUseId: string } } }
   | { event: { usageEvent: Record<string, unknown> } }
   | { event: { levelUp: LevelUpEvent } };
+
+// ── Gamification (Phase 3) ────────────────────────────────────────────────────
+export interface Streak {
+  student_id: string
+  current_len: number
+  longest_len: number
+  last_active_date: string | null
+}
+
+export interface Achievement {
+  id: string
+  slug: string
+  title: string
+  description?: string
+  criteria_json?: Record<string, unknown>
+  earned: boolean
+  earned_at?: string
+}
+
+// ── Adaptive Grammar (Phase 4) ────────────────────────────────────────────────
+export interface GrammarWeakness {
+  id: string
+  student_id: string
+  category: string
+  frequency: number
+  severity: number
+  times_seen: number
+  updated_at: string
+}
+
+export interface GrammarExercise {
+  id: string
+  student_id: string
+  category: string
+  prompt: string
+  options: Record<string, string>
+  answered_correctly?: boolean | null
+  created_at: string
+}
+
+export interface GrammarAnswerResult {
+  correct: boolean
+  correct_option: string
+  explanation: string
+  xp_awarded: number
+}
+
+// ── Adaptive Vocab (Phase 5) ──────────────────────────────────────────────────
+export interface VocabularyWord {
+  id: string
+  student_id: string
+  word: string
+  usage_count: number
+  mastery_score: number
+  first_seen_at: string
+  last_used_at: string
+}
+
+export interface WordUnlock {
+  id: string
+  student_id: string
+  session_id: string
+  word: string
+  introduced_at: string
+  used_at: string | null
+  xp_awarded: number
+}
+
+// ── Mock Test (Phase 7) ───────────────────────────────────────────────────────
+export interface MockTestResult {
+  session_id: string
+  status: 'ready' | 'pending'
+  band_overall?: number | null
+  fluency_coherence?: number | null
+  lexical_resource?: number | null
+  grammatical_range_accuracy?: number | null
+  pronunciation: null
+  parts_completed?: Record<string, boolean> | null
+  cue_card_topic?: string | null
+  premium: boolean
+}
+
+export interface CueCardEvent {
+  topic: string
+  bullets: string[]
+}
+
+// ── 4-Stage Lessons (Phase 6) ─────────────────────────────────────────────────
+export interface VocabStageWord {
+  word: string
+  meaning: string
+}
+
+export interface GrammarFocus {
+  category: string
+  note?: string
+}
+
+export interface LessonStages {
+  vocab: VocabStageWord[]
+  grammar_focus?: GrammarFocus
+}

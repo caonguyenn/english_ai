@@ -104,6 +104,9 @@ class ToolHandler:
         Only valid for class sessions; the server determines the XP amount from the
         class definition (the model does not choose XP).
         """
+        if self.session_type == "mock_test":
+            # Mock tests are scored post-session by the analysis engine — ignore this call.
+            return {"result": "Mock test scoring is handled post-session."}
         if self.session_type != "class":
             return {"error": "complete_class is only valid for class sessions"}
 

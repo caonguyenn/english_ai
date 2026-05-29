@@ -12,6 +12,7 @@ const SKILL_COLORS: Record<string, string> = {
   listening: 'var(--skill-listening)',
   grammar: 'var(--skill-grammar)',
   pronunciation: 'var(--skill-pronunciation)',
+  vocabulary: 'var(--accent-teal)',
 };
 
 function SkeletonBlock({ w = '100%', h = 20 }: { w?: string | number; h?: number }) {
@@ -133,7 +134,7 @@ function ClassCard({ cls, onStart }: { cls: ClassResponse; onStart: () => void }
       borderLeft: `3px solid ${skillColor}`,
       borderRadius: `0 var(--radius-lg) var(--radius-lg) 0`,
       padding: '20px 24px',
-      opacity: cls.completed ? 0.65 : 1,
+      opacity: cls.completed ? 0.85 : 1,
       transition: 'box-shadow 200ms, border-color 200ms',
     }}>
       {/* Top row */}
@@ -175,9 +176,12 @@ function ClassCard({ cls, onStart }: { cls: ClassResponse; onStart: () => void }
         {cls.description}
       </p>
 
-      {cls.completed ? (
-        <span style={{ fontSize: 13, color: 'var(--text-muted)' }}>Completed</span>
-      ) : (
+      <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+        {cls.completed && (
+          <span style={{ fontSize: 12, color: 'var(--status-success)', display: 'flex', alignItems: 'center', gap: 4 }}>
+            <CheckCircle size={14} strokeWidth={1.5} /> Completed
+          </span>
+        )}
         <button
           onClick={onStart}
           style={{
@@ -191,9 +195,9 @@ function ClassCard({ cls, onStart }: { cls: ClassResponse; onStart: () => void }
             transition: 'border-color 200ms, color 200ms',
           }}
         >
-          Start Class <ArrowRight size={14} strokeWidth={1.5} />
+          {cls.completed ? 'Practice Again' : 'Start Class'} <ArrowRight size={14} strokeWidth={1.5} />
         </button>
-      )}
+      </div>
     </div>
   );
 }

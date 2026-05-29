@@ -448,6 +448,58 @@ CREATE TABLE level_audit_log (
 );
 ```
 
+### Learning Intelligence Tables (Phase 1)
+
+```sql
+-- Student Learning Profile (rolled forward post-session)
+CREATE TABLE student_learning_profiles (
+  student_id      UUID PRIMARY KEY REFERENCES students(id) ON DELETE CASCADE,
+  
+  estimated_band  NUMERIC(3,1),                       -- rolling IELTS band estimate
+  
+  fluency_score   INTEGER,                            -- 0-100, EMA-weighted
+  grammar_score   INTEGER,                            -- 0-100, EMA-weighted
+  vocabulary_score INTEGER,                           -- 0-100, EMA-weighted
+  
+  strengths       JSONB,                              -- array of skill tags
+  weaknesses      JSONB,                              -- array of skill tags
+  
+  updated_at      TIMESTAMPTZ DEFAULT now()
+);
+
+-- Analysis Results (post-session via Nova Lite)
+CREATE TABLE analysis_results (
+  id              UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  
+  student_id      UUID NOT NULL REFERENCES students(id) ON DELETE CASCADE,
+  session_id      UUID NOT NULL REFERENCES sessions(id) ON DELETE CASCADE,
+  
+  grammar_mistakes JSONB,                             -- array of {category, severity, frequency}
+  vocabulary_usage JSONB,                             -- array of {word, level, mastery_delta}
+  fluency_metrics JSONB,                              -- {wpm, hesitation_rate, response_length, turn_count}
+  band_estimate   JSONB,                              -- {overall, fluency, grammar, vocabulary}
+  
+  created_at      TIMESTAMPTZ DEFAULT now()
+);
+
+-- Study Plans (generated from analysis)
+CREATE TABLE study_plans (
+  id              UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  
+  student_id      UUID NOT NULL REFERENCES students(id) ON DELETE CASCADE,
+  
+  target_band     NUMERIC(3,1),
+  focus_areas     JSONB,                              -- array of recommended skill focus
+  recommended_session_types JSONB,                    -- preferred lesson types
+  daily_tips      JSONB,                              -- array of personalized tips
+  
+  generated_at    TIMESTAMPTZ DEFAULT now(),
+  updated_at      TIMESTAMPTZ DEFAULT now()
+);
+```
+
+Index on `analysis_results(student_id, session_id)` for quick profile update lookups.
+
 ---
 
 ## 8. Audio Pipeline
@@ -582,9 +634,46 @@ A lightweight internal React page to:
 
 ## Implementation Status
 
-**Status:** ✓ Complete (May 27, 2026)
+**Status:** ✓ Phase 0–1 Complete (May 29, 2026) | Phases 2–7 Planned
 
-The full EnglishAI platform has been successfully implemented across 7 phases:
+### Completed
+
+**Phase 0: Foundations (May 29, 2026)** — UUID Migrations & Audio Fixes
+- Migrated all database primary keys (PK) from INTEGER to UUIDv7 (app-side generation via `uuid_utils.uuid7()`)
+- Implemented half-duplex audio mic gating tied to `audioOutput` WebSocket events
+- Converted frontend ID types from `number` to `string` throughout stores and services
+- Fixed scoping issues: `xp_in_module` calculation, `to_module_id` fallback in LevelAuditLog, SessionResponse `xp_awarded` default
+- Added database migration for nullable `from_module_id` in `level_audit_log`
+
+**Phase 1: Analysis Engine (May 29, 2026)** — Post-Session Learning Intelligence
+- 3 new database models: `AnalysisResult`, `StudentLearningProfile`, `StudyPlan`
+- Amazon Nova Lite integration via boto3 `converse()` with JSON-schema enforcement
+- Transcript serialization extracting fluency metrics: wpm, hesitation rate, response length, turn count
+- Rolling student profile updates with exponential moving average (EMA) for band estimates
+- Study plan generation with target band, focus areas, and daily tips
+- 27/27 unit + integration tests passing
+- Post-session Celery task pipeline with graceful error handling
+
+### Phase 1 Architecture (New in this version)
+
+Learning Intelligence runs **post-session** as a Celery task, analyzing transcripts via Amazon Nova Lite:
+
+```text
+Nova Sonic (live conversation) → Transcript (turn-based with timestamps) → 
+  Learning Intelligence Service (Celery + Nova Lite)
+    ├── Grammar Analyzer (mistake categories + severity)
+    ├── Vocabulary Analyzer (word mastery progression)
+    ├── Fluency Analyzer (coherence, response length, turn dynamics)
+    └── Band Predictor (3-skill rolling estimate)
+  ↓
+Analysis Result (persisted) + Student Learning Profile (rolled forward)
+```
+
+See `docs/learning-intelligence.md` for full specification.
+
+### Earlier Phases (Reference Implementation, May 27, 2026)
+
+The platform MVP was fully built across phases 1–7 (May 27):
 
 1. **DB + Backend Foundation** — Docker Compose (Postgres + Redis), all database models, Alembic migrations, seed data (7 modules, 28 classes, 10 topics), Cognito JWKS validation with dev mode bypass
 2. **REST API + Admin Routes** — 27 REST endpoints (auth, students, sessions, modules, playground, admin), Pydantic v2 schemas, service layer, level-up validation with cooldown and min-session checks, admin routes with Cognito groups auth
@@ -622,5 +711,5 @@ The full EnglishAI platform has been successfully implemented across 7 phases:
 - Access token expiry in WS (Finding #14)
 - Session creation cleanup (Finding #15)
 
-*Document version: 1.2 — Implementation complete*
-*Last updated: May 27, 2026*
+*Document version: 1.3 — Phase 0–1 complete; Phases 2–7 planned*
+*Last updated: May 29, 2026*

@@ -1,8 +1,9 @@
 import enum
 from datetime import datetime
+from typing import Any
 from uuid import UUID
 
-from sqlalchemy import DateTime, Enum, Float, ForeignKey, String, Text, Uuid, func
+from sqlalchemy import DateTime, Enum, Float, ForeignKey, JSON, String, Text, Uuid, func
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.db.base import Base, UUIDPrimaryKey
@@ -45,6 +46,7 @@ class Class(UUIDPrimaryKey, Base):
     system_prompt_addendum: Mapped[str | None] = mapped_column(Text, nullable=True)
     xp_reward: Mapped[int] = mapped_column(nullable=False, default=0)
     order_index: Mapped[int] = mapped_column(nullable=False)
+    stage_content: Mapped[Any] = mapped_column(JSON, nullable=True)
 
     module: Mapped[Module] = relationship("Module", back_populates="classes", lazy="raise")
 

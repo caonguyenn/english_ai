@@ -3,7 +3,7 @@ from datetime import datetime
 from typing import Any
 from uuid import UUID
 
-from sqlalchemy import DateTime, Enum, ForeignKey, JSON, Text, Uuid, func
+from sqlalchemy import DateTime, Enum, ForeignKey, JSON, SmallInteger, Text, Uuid, func
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.db.base import Base, UUIDPrimaryKey
@@ -15,6 +15,7 @@ class SessionType(str, enum.Enum):
     class_ = "class"
     playground = "playground"
     placement = "placement"
+    mock_test = "mock_test"  # Phase 7: IELTS mock test
 
 
 class Session(UUIDPrimaryKey, Base):
@@ -41,6 +42,7 @@ class Session(UUIDPrimaryKey, Base):
     transcript_json: Mapped[Any] = mapped_column(JSON, nullable=True)
     summary_json: Mapped[Any] = mapped_column(JSON, nullable=True)
     xp_awarded: Mapped[int] = mapped_column(nullable=False, default=0)
+    current_stage: Mapped[int | None] = mapped_column(SmallInteger, nullable=True)
 
     skill_scores: Mapped[list["SkillScore"]] = relationship(
         "SkillScore", back_populates="session", lazy="raise"

@@ -96,17 +96,55 @@ def _get_client() -> boto3.client:
     return _local.bedrock
 
 
-def analyze_transcript(transcript_text: str) -> dict:
+def analyze_transcript(transcript_text: str, system_prompt: str | None = None) -> dict:
     """Call Nova Lite with the serialized transcript. Returns parsed analysis dict.
 
     Uses toolConfig with toolChoice to force structured JSON output.
     Raises ValueError on missing/malformed tool response (caller should retry).
+
+    Args:
+        transcript_text: Serialized transcript text.
+        system_prompt: Override the default ANALYZER_SYSTEM_PROMPT. Used by
+            memory_extractor which needs a different extraction instruction.
+            When provided, toolConfig is omitted so Nova returns plain JSON text.
     """
     client = _get_client()
 
+    effective_system = system_prompt or ANALYZER_SYSTEM_PROMPT
+
+    # When a custom system_prompt is supplied (e.g. memory extraction), we don't
+    # force a tool call — the caller wants free-form JSON in the assistant turn.
+    if system_prompt:
+        response = client.converse(
+            modelId=settings.NOVA_ANALYSIS_MODEL_ID,
+            system=[{"text": effective_system}],
+            messages=[{
+                "role": "user",
+                "content": [{"text": transcript_text}],
+            }],
+            inferenceConfig={"maxTokens": 512, "temperature": 0.1},
+        )
+        # Extract plain text content and parse JSON manually
+        content_blocks = response["output"]["message"]["content"]
+        text_block = next(
+            (b["text"] for b in content_blocks if "text" in b),
+            None,
+        )
+        if text_block is None:
+            raise ValueError("Nova returned no text content for custom prompt call")
+        import json as _json
+        # Strip markdown code fences if present
+        cleaned = text_block.strip()
+        if cleaned.startswith("```"):
+            cleaned = cleaned.split("```", 2)[1]
+            if cleaned.startswith("json"):
+                cleaned = cleaned[4:]
+            cleaned = cleaned.rsplit("```", 1)[0]
+        return _json.loads(cleaned.strip())
+
     response = client.converse(
         modelId=settings.NOVA_ANALYSIS_MODEL_ID,
-        system=[{"text": ANALYZER_SYSTEM_PROMPT}],
+        system=[{"text": effective_system}],
         messages=[{
             "role": "user",
             "content": [{"text": transcript_text}],

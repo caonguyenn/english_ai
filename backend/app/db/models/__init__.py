@@ -5,6 +5,11 @@ from app.db.models.session import Session, SkillScore
 from app.db.models.level_audit import LevelAuditLog
 from app.db.models.playground_topic import PlaygroundTopic
 from app.db.models.learning import AnalysisResult, StudentLearningProfile, StudyPlan
+from app.db.models.memory import StudentMemory
+from app.db.models.gamification import Streak, Achievement, StudentAchievement
+from app.db.models.grammar import StudentGrammarWeakness, GrammarExercise
+from app.db.models.vocab import StudentVocabulary, WordUnlock
+from app.db.models.mock_test import MockTestResult
 
 __all__ = [
     "Student",
@@ -18,4 +23,13 @@ __all__ = [
     "AnalysisResult",
     "StudentLearningProfile",
     "StudyPlan",
+    "StudentMemory",
+    "Streak",
+    "Achievement",
+    "StudentAchievement",
+    "StudentGrammarWeakness",
+    "GrammarExercise",
+    "StudentVocabulary",
+    "WordUnlock",
+    "MockTestResult",
 ]

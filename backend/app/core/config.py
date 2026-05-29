@@ -39,8 +39,16 @@ class Settings(BaseSettings):
     # Playground XP cap
     PLAYGROUND_XP_DAILY_CAP_PCT: int = 60
 
+    # Memory injection thresholds
+    MEMORY_INJECT_MIN_CONFIDENCE: int = 60
+    MEMORY_INJECT_MAX_COUNT: int = 8
+
     # Internal service-to-service secret (WS → REST level-up endpoint)
     INTERNAL_SECRET: str = "change-me-in-production"
+
+    # Grammar practice XP
+    GRAMMAR_BASE_XP: int = 10
+    RECOMMENDED_XP_MULTIPLIER: float = 2.0
 
     model_config = {"env_file": ".env", "env_file_encoding": "utf-8", "extra": "ignore"}
 

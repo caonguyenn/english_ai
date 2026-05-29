@@ -10,25 +10,20 @@ interface AppShellProps {
   pageTitle?: string;
 }
 
-interface ModulesResponse {
-  modules: ModuleResponse[];
-  current_module_id?: number | null;
-}
-
 export default function AppShell({ children, pageTitle = '' }: AppShellProps) {
   const profile = useAuthStore((s) => s.profile);
 
-  const { data: modulesData } = useQuery<ModulesResponse>({
+  const { data: modulesData } = useQuery<ModuleResponse[]>({
     queryKey: ['modules'],
     queryFn: async () => {
-      const res = await api.get<ModulesResponse>('/modules');
+      const res = await api.get<ModuleResponse[]>('/modules');
       return res.data;
     },
     enabled: !!profile,
     staleTime: 5 * 60 * 1000,
   });
 
-  const currentModule = modulesData?.modules?.find(
+  const currentModule = modulesData?.find(
     (m) => m.id === profile?.current_module_id,
   );
 

@@ -23,7 +23,7 @@ export interface ClassCompleteData {
 }
 
 export interface SessionWebSocketConfig {
-  sessionType: 'class' | 'playground' | 'placement';
+  sessionType: 'class' | 'playground' | 'placement' | 'mock_test';
   refId: string | null;
   onAudioOutput: (audioBytes: ArrayBuffer) => void;
   onTextOutput: (text: string, role: string) => void;

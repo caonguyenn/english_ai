@@ -1,4 +1,4 @@
-"""Idempotent seed script: 7 modules × 4 classes + 10 playground topics.
+"""Idempotent seed script: 7 modules × 4 classes + 10 playground topics + achievements.
 
 Run from the backend/ directory:
     python scripts/seed.py
@@ -11,6 +11,7 @@ import sys
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from sqlalchemy import select
+from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.db.session import async_session
 from app.db.models.module import Class, Enrollment, Module, SkillType  # noqa: F401
@@ -34,6 +35,7 @@ CLASS_TEMPLATE = [
     {"skill_type": SkillType.listening,     "xp_reward": 80, "order_index": 2},
     {"skill_type": SkillType.grammar,       "xp_reward": 70, "order_index": 3},
     {"skill_type": SkillType.pronunciation, "xp_reward": 70, "order_index": 4},
+    {"skill_type": SkillType.vocabulary,    "xp_reward": 70, "order_index": 5},
 ]
 
 PLAYGROUND_TOPICS = [
@@ -48,6 +50,115 @@ PLAYGROUND_TOPICS = [
     {"slug": "work-career",           "title": "Work & Career"},
     {"slug": "animals-wildlife",      "title": "Animals & Wildlife"},
 ]
+
+
+# ── Gamification Achievements (Phase 3) ───────────────────────────────────────
+ACHIEVEMENTS = [
+    {
+        "slug": "first-conversation",
+        "title": "First Conversation",
+        "description": "Complete your first session",
+        "criteria_json": {"type": "session_count", "threshold": 1},
+    },
+    {
+        "slug": "streak-7",
+        "title": "7-Day Streak",
+        "description": "Practice 7 days in a row",
+        "criteria_json": {"type": "streak", "threshold": 7},
+    },
+    {
+        "slug": "streak-30",
+        "title": "30-Day Streak",
+        "description": "Practice 30 days in a row",
+        "criteria_json": {"type": "streak", "threshold": 30},
+    },
+    {
+        "slug": "streak-100",
+        "title": "100-Day Streak",
+        "description": "Practice 100 days in a row",
+        "criteria_json": {"type": "streak", "threshold": 100},
+    },
+    {
+        "slug": "first-mock-test",
+        "title": "First Mock Test",
+        "description": "Complete your first IELTS mock test",
+        "criteria_json": {"type": "mock_test_count", "threshold": 1, "deferred": True},
+    },
+    {
+        "slug": "words-spoken-1000",
+        "title": "1,000 Words Spoken",
+        "description": "Use 1,000 different words in conversation",
+        "criteria_json": {"type": "words_spoken", "threshold": 1000, "deferred": True},
+    },
+    {
+        "slug": "vocabulary-master",
+        "title": "Vocabulary Master",
+        "description": "Master 50 target vocabulary words",
+        "criteria_json": {"type": "vocab_mastered", "threshold": 50, "deferred": True},
+    },
+]
+
+
+STAGE_DEFAULTS: dict[str, dict] = {
+    "speaking": {
+        "vocab": [
+            {"word": "express", "meaning": "to show or say clearly"},
+            {"word": "opinion", "meaning": "what you think about something"},
+            {"word": "discuss", "meaning": "to talk about a topic"},
+        ],
+        "grammar_focus": {"category": "present_tense", "note": "Use present simple to state facts and opinions."},
+    },
+    "listening": {
+        "vocab": [
+            {"word": "understand", "meaning": "to get the meaning of"},
+            {"word": "describe", "meaning": "to say what something is like"},
+            {"word": "explain", "meaning": "to make something clear"},
+        ],
+        "grammar_focus": {"category": "question_forms", "note": "Use WH-questions to check understanding."},
+    },
+    "grammar": {
+        "vocab": [
+            {"word": "sentence", "meaning": "a complete thought with subject and verb"},
+            {"word": "tense", "meaning": "the form of a verb showing when an action happens"},
+            {"word": "clause", "meaning": "a group of words with subject and verb"},
+        ],
+        "grammar_focus": {"category": "past_tense", "note": "Use past simple for completed past actions."},
+    },
+    "pronunciation": {
+        "vocab": [
+            {"word": "stress", "meaning": "emphasis on a syllable or word"},
+            {"word": "rhythm", "meaning": "the pattern of sounds in speech"},
+            {"word": "intonation", "meaning": "the rise and fall of your voice"},
+        ],
+        "grammar_focus": {"category": "article", "note": "Use 'a', 'an', or 'the' correctly before nouns."},
+    },
+    "vocabulary": {
+        "vocab": [
+            {"word": "context", "meaning": "the situation in which a word is used"},
+            {"word": "synonym", "meaning": "a word with a similar meaning"},
+            {"word": "definition", "meaning": "the exact meaning of a word"},
+        ],
+        "grammar_focus": {"category": "collocations", "note": "Some words naturally go together — learn them as pairs."},
+    },
+}
+
+
+async def seed_stage_content(db: AsyncSession) -> None:
+    """Populate stage_content for all classes (idempotent — only sets if null)."""
+    result = await db.execute(select(Class))
+    classes = result.scalars().all()
+    updated = 0
+    for cls in classes:
+        if cls.stage_content is not None:
+            continue
+        skill = cls.skill_type
+        skill_str = skill.value if hasattr(skill, "value") else str(skill)
+        content = STAGE_DEFAULTS.get(skill_str)
+        if content:
+            cls.stage_content = content
+            updated += 1
+    await db.commit()
+    print(f"  + Seeded stage_content for {updated} classes")
 
 
 async def seed() -> None:
@@ -98,7 +209,24 @@ async def seed() -> None:
             else:
                 print(f"  ~ Topic: {topic_data['slug']} (exists)")
 
+        # ── Gamification Achievements ─────────────────────────────────────
+        from app.db.models.gamification import Achievement
+        from app.db.base import _uuid7
+        for ach_data in ACHIEVEMENTS:
+            result = await db.execute(
+                select(Achievement).where(Achievement.slug == ach_data["slug"])
+            )
+            if result.scalar_one_or_none() is None:
+                db.add(Achievement(id=_uuid7(), **ach_data))
+                print(f"  + Achievement: {ach_data['slug']}")
+            else:
+                print(f"  ~ Achievement: {ach_data['slug']} (exists)")
+
         await db.commit()
+
+        # ── Stage Content (Phase 6) ───────────────────────────────────────
+        await seed_stage_content(db)
+
         print("\nSeed complete.")
 
 

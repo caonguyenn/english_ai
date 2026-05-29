@@ -23,7 +23,7 @@ from app.services.tool_handler import ToolHandler
 logger = logging.getLogger(__name__)
 router = APIRouter()
 
-_VALID_TYPES = {"class", "playground", "placement"}
+_VALID_TYPES = {"class", "playground", "placement", "mock_test"}
 
 
 # ---------------------------------------------------------------------------
@@ -75,7 +75,8 @@ async def websocket_session(
         await websocket.accept()
         await websocket.close(code=1008, reason="Invalid session type")
         return
-    if type != "placement" and ref_id is None:
+    # placement and mock_test sessions have no ref_id — only class/playground require it
+    if type in ("class", "playground") and ref_id is None:
         await websocket.accept()
         await websocket.close(code=1008, reason="ref_id required for class and playground sessions")
         return

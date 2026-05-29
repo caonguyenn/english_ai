@@ -62,6 +62,18 @@ class SessionService:
 
         await db.commit()
         await db.refresh(session)
+
+        # Phase 3: streak + achievements on any XP-awarding session
+        if data.xp_awarded and data.xp_awarded > 0:
+            try:
+                from app.services import streak_service, achievement_service
+                await streak_service.touch(db, session.student_id)
+                await achievement_service.evaluate(db, session.student_id)
+                await db.commit()
+            except Exception as exc:
+                import logging
+                logging.getLogger(__name__).error("gamification hooks (end_session) failed: %s", exc)
+
         return session
 
     @staticmethod
@@ -145,6 +157,16 @@ class SessionService:
 
         await db.commit()
         await db.refresh(session)
+
+        # Phase 3: Update streak + check achievements (non-fatal)
+        try:
+            from app.services import streak_service, achievement_service
+            await streak_service.touch(db, session.student_id)
+            await achievement_service.evaluate(db, session.student_id)
+            await db.commit()
+        except Exception as exc:
+            import logging
+            logging.getLogger(__name__).error("gamification hooks failed (non-fatal): %s", exc)
 
         return {
             "completed": True,

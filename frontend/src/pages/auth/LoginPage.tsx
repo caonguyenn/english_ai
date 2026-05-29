@@ -3,6 +3,19 @@ import { useNavigate } from 'react-router-dom';
 import { gsap } from 'gsap';
 import { Mic, BookOpen, TrendingUp } from 'lucide-react';
 import { useAuth } from '../../hooks/useAuth';
+import { useAuthStore } from '../../store/authStore';
+import { api } from '../../services/api';
+import type { StudentProfile } from '../../types';
+
+interface DevLoginResponse {
+  access_token: string;
+  profile: StudentProfile;
+}
+
+// Show dev-login button when Cognito is not configured with real credentials
+const IS_DEV_MODE =
+  !import.meta.env.VITE_COGNITO_USER_POOL_ID ||
+  String(import.meta.env.VITE_COGNITO_USER_POOL_ID).includes('PLACEHOLDER');
 
 type Mode = 'signin' | 'signup' | 'confirm';
 
@@ -15,6 +28,7 @@ const FEATURES = [
 export default function LoginPage() {
   const navigate = useNavigate();
   const { signIn, signUp, confirmSignUp } = useAuth();
+  const { setAccessToken, setProfile } = useAuthStore();
 
   const [mode, setMode] = useState<Mode>('signin');
   const [email, setEmail] = useState('');
@@ -38,6 +52,21 @@ export default function LoginPage() {
     });
     return () => ctx.revert();
   }, []);
+
+  async function handleDevLogin() {
+    setError(null);
+    setIsSubmitting(true);
+    try {
+      const { data } = await api.post<DevLoginResponse>('/auth/dev-login');
+      setAccessToken(data.access_token);
+      setProfile(data.profile);
+      navigate('/', { replace: true });
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Dev login failed');
+    } finally {
+      setIsSubmitting(false);
+    }
+  }
 
   async function handleSignIn(e: React.FormEvent) {
     e.preventDefault();
@@ -248,6 +277,40 @@ export default function LoginPage() {
                 ← Back to sign in
               </button>
             </form>
+          )}
+
+          {IS_DEV_MODE && mode !== 'confirm' && (
+            <>
+              <div style={{
+                display: 'flex', alignItems: 'center', gap: 12, margin: '24px 0 16px',
+              }}>
+                <div style={{ flex: 1, height: 1, background: 'var(--border-default)' }} />
+                <span style={{ fontSize: 12, color: 'var(--text-muted, var(--text-secondary))', whiteSpace: 'nowrap' }}>
+                  development mode
+                </span>
+                <div style={{ flex: 1, height: 1, background: 'var(--border-default)' }} />
+              </div>
+              <button
+                type="button"
+                disabled={isSubmitting}
+                onClick={() => { void handleDevLogin(); }}
+                style={{
+                  width: '100%',
+                  padding: '11px 0',
+                  background: 'var(--bg-elevated)',
+                  border: '1px solid var(--border-default)',
+                  borderRadius: 'var(--radius-pill)',
+                  color: 'var(--text-secondary)',
+                  fontSize: 13,
+                  fontWeight: 500,
+                  fontFamily: 'var(--font-body)',
+                  cursor: isSubmitting ? 'not-allowed' : 'pointer',
+                  opacity: isSubmitting ? 0.6 : 1,
+                }}
+              >
+                Dev Login (skip Cognito)
+              </button>
+            </>
           )}
         </div>
       </div>

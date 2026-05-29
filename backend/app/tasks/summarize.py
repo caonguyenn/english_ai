@@ -142,6 +142,44 @@ def _run_analysis_pipeline(db, session) -> None:
             generated_plan=plan_data,
         ))
 
+    # Phase 2: Memory extraction (non-fatal — failure must not abort the analysis)
+    try:
+        from app.services.analysis import memory_extractor
+        from app.services.memory_service import upsert_many_sync
+
+        transcript_text, _ = transcript_serializer.serialize(session.transcript_json)
+        if transcript_text:
+            facts = memory_extractor.extract(transcript_text, str(session.student_id))
+            if facts:
+                upsert_many_sync(db, session.student_id, session.id, facts)
+                logger.info(
+                    "memory_extractor: stored %d facts for student %s",
+                    len(facts), session.student_id,
+                )
+    except Exception as exc:
+        logger.error(
+            "summarize_session: memory extraction failed (non-fatal): %s", exc
+        )
+
+    # Phase 4: Grammar aggregation (non-fatal — failure must not abort analysis)
+    try:
+        from app.services.grammar.aggregator import aggregate as grammar_aggregate
+        grammar_aggregate(db, session.student_id, analysis_row)
+        logger.info("grammar_aggregator: processed session %s", session.id)
+    except Exception as exc:
+        logger.error("summarize_session: grammar aggregation failed (non-fatal): %s", exc)
+
+    # Phase 5: Vocabulary fold (non-fatal)
+    try:
+        from app.services.vocab.vocab_service import upsert_usage as vocab_upsert
+        from app.services.vocab.word_unlock_service import detect_and_award
+        vocab_upsert(db, session.student_id, analysis_row)
+        awarded = detect_and_award(db, session.student_id, analysis_row)
+        if awarded:
+            logger.info("word_unlock: awarded for words %s session=%s", awarded, session.id)
+    except Exception as exc:
+        logger.error("summarize_session: vocab fold failed (non-fatal): %s", exc)
+
 
 def _extract_summary(transcript: dict) -> dict:
     """Heuristic summary — provides context for prompt_builder session injection."""

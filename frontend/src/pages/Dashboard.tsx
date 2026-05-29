@@ -2,11 +2,15 @@ import { useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
 import { gsap } from 'gsap';
-import { ArrowRight, Gamepad2, Flame } from 'lucide-react';
-import { api } from '../services/api';
+import { ArrowRight, Gamepad2, Flame, FileText } from 'lucide-react';
+import { api, getStreak, getAchievements, getVocabulary } from '../services/api';
 import { useAuthStore } from '../store/authStore';
 import AppShell from '../components/layout/AppShell';
-import type { ModuleResponse, SessionResponse } from '../types';
+import { StreakFlame } from '../components/gamification/StreakFlame';
+import { AchievementsGrid } from '../components/gamification/AchievementsGrid';
+import { RecommendedPractice } from '../components/dashboard/RecommendedPractice';
+import { VocabularyGrowthWidget } from '../components/vocab/VocabularyGrowthWidget';
+import type { ModuleResponse, SessionResponse, Streak, Achievement, VocabularyWord } from '../types';
 
 interface ProgressResponse {
   xp_total: number;
@@ -15,18 +19,15 @@ interface ProgressResponse {
   skill_averages: Record<string, number>;
 }
 
-interface ModulesResponse {
-  modules: ModuleResponse[];
-  current_module_id?: number | null;
-}
 
 const SKILL_COLORS: Record<string, string> = {
   speaking: 'var(--skill-speaking)',
   listening: 'var(--skill-listening)',
   grammar: 'var(--skill-grammar)',
   pronunciation: 'var(--skill-pronunciation)',
+  vocabulary: 'var(--accent-teal)',
 };
-const SKILLS = ['speaking', 'listening', 'grammar', 'pronunciation'];
+const SKILLS = ['speaking', 'listening', 'grammar', 'pronunciation', 'vocabulary'];
 
 function greeting(): string {
   const h = new Date().getHours();
@@ -44,9 +45,9 @@ export default function Dashboard() {
   const profile = useAuthStore((s) => s.profile);
   const containerRef = useRef<HTMLDivElement>(null);
 
-  const { data: modulesData, isLoading: modLoading } = useQuery<ModulesResponse>({
+  const { data: modulesData, isLoading: modLoading } = useQuery<ModuleResponse[]>({
     queryKey: ['modules'],
-    queryFn: async () => (await api.get<ModulesResponse>('/modules')).data,
+    queryFn: async () => (await api.get<ModuleResponse[]>('/modules')).data,
     enabled: !!profile,
     staleTime: 5 * 60 * 1000,
   });
@@ -63,7 +64,28 @@ export default function Dashboard() {
     enabled: !!profile,
   });
 
-  const currentModule = modulesData?.modules?.find(
+  const { data: streak } = useQuery<Streak>({
+    queryKey: ['streak', profile?.id],
+    queryFn: () => getStreak(profile!.id) as Promise<Streak>,
+    enabled: !!profile?.id,
+  });
+
+  const { data: achievements } = useQuery<Achievement[]>({
+    queryKey: ['achievements', profile?.id],
+    queryFn: () => getAchievements(profile!.id) as Promise<Achievement[]>,
+    enabled: !!profile?.id,
+  });
+
+  const { data: vocab } = useQuery<VocabularyWord[]>({
+    queryKey: ['vocabulary', profile?.id],
+    queryFn: () => getVocabulary(profile!.id) as Promise<VocabularyWord[]>,
+    enabled: !!profile?.id,
+  });
+
+  const totalWords = vocab?.length ?? 0;
+  const masteredWords = vocab?.filter((v) => v.mastery_score >= 80).length ?? 0;
+
+  const currentModule = modulesData?.find(
     (m) => m.id === profile?.current_module_id,
   );
 
@@ -276,6 +298,26 @@ export default function Dashboard() {
                   <div style={{ fontSize: 12, color: 'var(--text-secondary)' }}>Jump into free talk →</div>
                 </div>
               </button>
+              <button
+                onClick={() => navigate('/mock-test')}
+                style={{
+                  display: 'flex', alignItems: 'center', gap: 14,
+                  background: 'rgba(99,102,241,0.08)',
+                  border: '1px solid rgba(99,102,241,0.2)',
+                  borderRadius: 'var(--radius-lg)',
+                  padding: '16px 18px',
+                  cursor: 'pointer', textAlign: 'left',
+                }}
+              >
+                <FileText size={20} strokeWidth={1.5} style={{ color: '#6366f1', flexShrink: 0 }} />
+                <div>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 2 }}>
+                    <span style={{ fontSize: 14, fontWeight: 600, color: 'var(--text-primary)' }}>IELTS Mock Test</span>
+                    <span style={{ fontSize: 10, fontWeight: 700, background: '#6366f1', color: '#fff', padding: '1px 6px', borderRadius: 3, letterSpacing: '0.04em' }}>PREMIUM</span>
+                  </div>
+                  <div style={{ fontSize: 12, color: 'var(--text-secondary)' }}>Full 3-part exam simulation →</div>
+                </div>
+              </button>
               <div style={{
                 background: 'var(--bg-surface)',
                 border: '1px solid var(--border-subtle)',
@@ -288,6 +330,45 @@ export default function Dashboard() {
                 <div style={{ fontSize: 12, color: 'var(--text-secondary)' }}>Complete 1 class · earn 80 XP</div>
               </div>
             </div>
+
+            {/* Streak widget */}
+            {streak && (
+              <div data-animate style={{
+                background: 'var(--bg-surface)',
+                border: '1px solid var(--border-subtle)',
+                borderRadius: 'var(--radius-lg)',
+                padding: '16px 18px',
+              }}>
+                <StreakFlame currentLen={streak.current_len} longestLen={streak.longest_len} />
+              </div>
+            )}
+
+            {/* Achievements */}
+            {achievements && achievements.length > 0 && (
+              <div data-animate style={{
+                background: 'var(--bg-surface)',
+                border: '1px solid var(--border-subtle)',
+                borderRadius: 'var(--radius-lg)',
+                padding: '16px 18px',
+              }}>
+                <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--text-primary)', marginBottom: 12 }}>
+                  Achievements
+                </div>
+                <AchievementsGrid achievements={achievements} />
+              </div>
+            )}
+
+            {/* Recommended Grammar Practice (Phase 4) */}
+            {profile && (
+              <div data-animate>
+                <RecommendedPractice studentId={profile.id} />
+              </div>
+            )}
+
+            {/* Vocabulary Growth (Phase 5) */}
+            <div data-animate>
+              <VocabularyGrowthWidget totalWords={totalWords} masteredWords={masteredWords} />
+            </div>
           </div>
         </div>
       </div>
@@ -298,10 +379,12 @@ export default function Dashboard() {
 function SessionRow({ session }: { session: SessionResponse }) {
   const label = session.session_type === 'class' ? 'Class'
     : session.session_type === 'playground' ? 'Playground'
+    : session.session_type === 'mock_test' ? 'Mock Test'
     : 'Placement';
 
   const typeColor = session.session_type === 'class' ? 'var(--skill-speaking)'
     : session.session_type === 'playground' ? 'var(--accent-teal)'
+    : session.session_type === 'mock_test' ? '#6366f1'
     : 'var(--skill-grammar)';
 
   const date = new Date(session.started_at).toLocaleDateString(undefined, { month: 'short', day: 'numeric' });

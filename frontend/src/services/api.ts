@@ -2,7 +2,7 @@ import axios from 'axios';
 import type { AxiosInstance, InternalAxiosRequestConfig } from 'axios';
 import { useAuthStore } from '../store/authStore';
 
-const API_BASE_URL = (import.meta.env.VITE_API_URL as string | undefined) ?? 'http://localhost:8000';
+const API_BASE_URL = `${(import.meta.env.VITE_API_URL as string | undefined) ?? 'http://localhost:8000'}/api/v1`;
 
 export const api: AxiosInstance = axios.create({
   baseURL: API_BASE_URL,
@@ -18,61 +18,63 @@ api.interceptors.request.use((config: InternalAxiosRequestConfig) => {
   return config;
 });
 
-// ── Response interceptor: 401 retry with queue ───────────────────────────────
-let isRefreshing = false;
-let failedQueue: Array<{
-  resolve: (token: string) => void;
-  reject: (err: unknown) => void;
-}> = [];
-
-function drainQueue(token: string | null, err: unknown): void {
-  failedQueue.forEach(({ resolve, reject }) => {
-    if (token) resolve(token);
-    else reject(err);
-  });
-  failedQueue = [];
-}
-
+// ── Response interceptor: redirect to login on 401 ───────────────────────────
 api.interceptors.response.use(
   (response) => response,
-  async (error: unknown) => {
-    const axiosError = error as {
-      config: InternalAxiosRequestConfig & { _retry?: boolean };
-      response?: { status: number };
-    };
-
-    const originalRequest = axiosError.config;
-
-    if (axiosError.response?.status === 401 && !originalRequest._retry) {
-      originalRequest._retry = true;
-
-      if (isRefreshing) {
-        // Queue this request until the ongoing refresh completes
-        return new Promise<string>((resolve, reject) => {
-          failedQueue.push({ resolve, reject });
-        }).then((token) => {
-          originalRequest.headers.Authorization = `Bearer ${token}`;
-          return api(originalRequest);
-        });
-      }
-
-      isRefreshing = true;
-
-      try {
-        await useAuthStore.getState().refreshToken();
-        const newToken = useAuthStore.getState().accessToken!;
-        drainQueue(newToken, null);
-        originalRequest.headers.Authorization = `Bearer ${newToken}`;
-        return api(originalRequest);
-      } catch (err) {
-        drainQueue(null, err);
-        window.location.href = '/auth/login';
-        return Promise.reject(err);
-      } finally {
-        isRefreshing = false;
-      }
+  (error: unknown) => {
+    const axiosError = error as { response?: { status: number } };
+    if (axiosError.response?.status === 401) {
+      useAuthStore.getState().logout();
+      window.location.href = '/auth/login';
     }
-
     return Promise.reject(error);
   },
 );
+
+// ── Feedback + Memory (Phase 2) ──────────────────────────────────────────────
+export const getSessionAnalysis = (sessionId: string) =>
+  api.get(`/sessions/${sessionId}/analysis`).then(r => r.data);
+
+export const getStudentProfile = (studentId: string) =>
+  api.get(`/students/${studentId}/profile`).then(r => r.data);
+
+export const getStudentMemories = (studentId: string) =>
+  api.get(`/students/${studentId}/memories`).then(r => r.data);
+
+// ── Gamification (Phase 3) ────────────────────────────────────────────────────
+export const getStreak = (studentId: string) =>
+  api.get(`/students/${studentId}/streak`).then(r => r.data)
+
+export const getAchievements = (studentId: string) =>
+  api.get(`/students/${studentId}/achievements`).then(r => r.data)
+
+// ── Adaptive Grammar (Phase 4) ────────────────────────────────────────────────
+export const getGrammarWeaknesses = (studentId: string) =>
+  api.get(`/students/${studentId}/grammar-weaknesses`).then(r => r.data)
+
+export const generateGrammarExercise = (studentId: string) =>
+  api.post(`/students/${studentId}/grammar-exercises`).then(r => r.data)
+
+export const answerGrammarExercise = (exerciseId: string, selected: string) =>
+  api.post(`/grammar-exercises/${exerciseId}/answer`, { selected }).then(r => r.data)
+
+// ── Adaptive Vocab (Phase 5) ──────────────────────────────────────────────────
+export const getVocabulary = (studentId: string) =>
+  api.get(`/students/${studentId}/vocabulary`).then(r => r.data)
+
+export const getWordUnlocks = (studentId: string) =>
+  api.get(`/students/${studentId}/word-unlocks`).then(r => r.data)
+
+// ── Mock Test (Phase 7) ───────────────────────────────────────────────────────
+export const getMockTestResult = (sessionId: string) =>
+  api.get(`/sessions/${sessionId}/mock-result`).then(r => r.data)
+
+export const createMockTestSession = () =>
+  api.post('/sessions', { session_type: 'mock_test' }).then(r => r.data)
+
+// ── 4-Stage Lessons (Phase 6) ─────────────────────────────────────────────────
+export const getClassStages = (classId: string) =>
+  api.get(`/classes/${classId}/stages`).then(r => r.data)
+
+export const patchSessionStage = (sessionId: string, stage: number) =>
+  api.patch(`/sessions/${sessionId}/stage`, { stage }).then(r => r.data)

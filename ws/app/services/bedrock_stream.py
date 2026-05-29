@@ -15,14 +15,11 @@ from aws_sdk_bedrock_runtime.client import (
     BedrockRuntimeClient,
     InvokeModelWithBidirectionalStreamOperationInput,
 )
-from aws_sdk_bedrock_runtime.config import (
-    Config,
-    HTTPAuthSchemeResolver,
-    SigV4AuthScheme,
-)
+from aws_sdk_bedrock_runtime.config import Config
 from aws_sdk_bedrock_runtime.models import (
     BidirectionalInputPayloadPart,
     InvokeModelWithBidirectionalStreamInputChunk,
+    InvokeModelWithBidirectionalStreamOutputChunk,
 )
 from smithy_aws_core.identity.environment import EnvironmentCredentialsResolver
 
@@ -50,6 +47,8 @@ class BedrockStreamManager:
         self.barge_in = False
         self.role: str | None = None
         self.display_assistant_text = False
+        # True while Bedrock is actively sending audio output — keepalive must pause
+        self.assistant_speaking = False
 
         self.prompt_name = str(uuid.uuid4())
         self.content_name = str(uuid.uuid4())
@@ -77,8 +76,6 @@ class BedrockStreamManager:
         config = Config(
             endpoint_uri=f"https://bedrock-runtime.{self.region}.amazonaws.com",
             region=self.region,
-            http_auth_scheme_resolver=HTTPAuthSchemeResolver(),
-            http_auth_schemes={"aws.auth#sigv4": SigV4AuthScheme()},
             aws_credentials_identity_resolver=EnvironmentCredentialsResolver(),
         )
         self._client = BedrockRuntimeClient(config=config)
@@ -146,17 +143,16 @@ class BedrockStreamManager:
 
     async def _process_responses(self) -> None:
         try:
-            while self._is_active:
-                try:
-                    output = await self._stream.await_output()  # type: ignore[union-attr]
-                    result = await output[1].receive()
-                    if result.value and result.value.bytes_:
-                        self._handle_bytes(result.value.bytes_)
-                except StopAsyncIteration:
-                    break
-                except Exception as exc:
-                    logger.error("Bedrock response error: %s", exc)
-                    break
+            # await_output() must be called exactly once to get the output stream
+            _, output_stream = await self._stream.await_output()  # type: ignore[union-attr]
+            async for chunk in output_stream:
+                if isinstance(chunk, InvokeModelWithBidirectionalStreamOutputChunk):
+                    if chunk.value and chunk.value.bytes_:
+                        self._handle_bytes(chunk.value.bytes_)
+        except StopAsyncIteration:
+            pass
+        except Exception as exc:
+            logger.error("Bedrock response error: %s", exc)
         finally:
             logger.info("Bedrock response stream ended")
             self._is_active = False
@@ -180,9 +176,16 @@ class BedrockStreamManager:
                     )
                 except json.JSONDecodeError:
                     pass
+            if self.role == "ASSISTANT":
+                self.assistant_speaking = True
+        elif "audioOutput" in event:
+            self.assistant_speaking = True
+        elif "completionEnd" in event:
+            self.assistant_speaking = False
         elif "textOutput" in event:
             if '{ "interrupted" : true }' in event["textOutput"].get("content", ""):
                 self.barge_in = True
+                self.assistant_speaking = False
         elif "toolUse" in event:
             self._tool_name = event["toolUse"].get("toolName", "")
             self._tool_use_id = event["toolUse"].get("toolUseId", "")
